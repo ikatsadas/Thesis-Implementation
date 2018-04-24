@@ -12,7 +12,7 @@ client = MongoClient('localhost', 27017)
 # client = MongoClient(uri)
 db = client['getMostRetweetedFake']
 
-mins=30
+mins=30# number of minutes for the time interval
 
 def overall_figure():
     #get the max_timeUnits number of a tweet propagation time (in 30 mins units)
