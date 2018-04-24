@@ -10,9 +10,9 @@ import numpy as np
 # uri = "mongodb://user:SpYZ7EMlgs@snf-795686.vm.okeanos.grnet.gr:25"
 client = MongoClient('localhost', 27017)
 # client = MongoClient(uri)
-db = client['getMostRetweetedFake']
+db = client['getMostRetweetedTest']
 
-mins=600
+mins=30
 
 def overall_figure():
     #get the max_timeUnits number of a tweet propagation time (in 30 mins units)
@@ -128,6 +128,8 @@ def overall_figure():
 
 def individual_fugures():
     c=0
+    f, axarr = plt.subplots(2, 5,sharex=True,sharey=True)
+    matplotlib.rcParams.update({'font.size': 5})
     for og_tweet_collection in db.collection_names():  # for every tweet
         c=c+1
         if c>10:
@@ -148,8 +150,7 @@ def individual_fugures():
             x=[]
             it=0
             while(c_time<end_date):
-                c_time=start_date + timedelta(minutes=30 * it)
-                # print c_time.strftime("%Y-%m-%d,%H:%M")
+                c_time=start_date + timedelta(minutes=mins * it)
                 x.append(c_time)
                 it=it+1
 
@@ -175,20 +176,36 @@ def individual_fugures():
 
             counter=0
             for i in values:
-                print i
-
                 values[counter]=i/float(len(retweet_time))
-                print values[counter]
                 counter=counter+1
             dates = matplotlib.dates.date2num(x)
-            plt.plot_date(dates, values,'r--')
-            # xv = np.array(retweet_time)
-            # plt.plot(xv)
-            plt.xlabel('Time')
-            plt.xticks(rotation=30)
-            plt.ylabel('# of retweets')
-            plt.title('retweets in time')
-            plt.show()
+            if c<=5:
+                k=0
+                l=c-1
+            else:
+                k=1
+                l=c-6
+            # axarr[k, l].plot_date(dates, values, 'r--')
+            #trim the list to a smaller time interval
+            if(len(values)>30):
+                values=values[:30]
+            axarr[k, l].plot(values,'r--')
+            axarr[k, l].set_title(og_tweet_collection)
+            # plt.subplot(2, 5, c)
+            # plt.xticks(rotation=30)
+            # plt.ylabel('Frequency of retweets')
+            # plt.title(str(c))#tweet ID
+            # plt.plot_date(dates, values, 'r--')
+            plt.subplots_adjust(left=None, bottom=None, right=None, top=None, wspace=0.1, hspace=0.2)
+        else:
+            c=c-1
+    for ax in axarr.flat:
+        ax.set(xlabel='# of 30 mins', ylabel='Frequency of retweets')
+        ax.label_outer()
+    for ax in f.axes:
+        matplotlib.pyplot.sca(ax)
+        plt.xticks(rotation=30)
+    plt.show()
 
-overall_figure()
-# individual_fugures()
+# overall_figure()
+individual_fugures()
