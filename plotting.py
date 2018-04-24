@@ -15,6 +15,7 @@ db = client['getMostRetweetedFake']
 mins=30# number of minutes for the time interval
 
 def overall_figure():
+    ###########################################################################
     #get the max_timeUnits number of a tweet propagation time (in 30 mins units)
     print "Calc max_timeUnits"
     c=0
@@ -40,22 +41,24 @@ def overall_figure():
                 c_time = start_date + timedelta(minutes=mins * it)
                 x.append(c_time)
                 it = it + 1
-            if max_timeUnits<len(x):  # initialization
+            if max_timeUnits<len(x):  # initialization-get the biggest number of time intervals
                 print max_timeUnits, "cahnged to ", len(x)
                 max_timeUnits = len(x)
+        else:
+            c=c-1
     #############################################
     print "calc values"
-    #initialization
+    #initialization-create two lists values and numberOftweets and init them
     values=[]
     numOftweets=[]
     for x in range(0, max_timeUnits):
-        values.append(0)
-        numOftweets.append(0)
+        values.append(0)#on each row it has the sum of the number of retweets in the (rowNum) half-hour
+        numOftweets.append(0)#on each row has the number of tweets participated in values in order to calculate the avg
 
     c=0
     for og_tweet_collection in db.collection_names():  # for every tweet
         c=c+1
-        if c>90:
+        if c>250:
             break
         collection = db[og_tweet_collection]
         cursor = collection.find({})  # Gets the tweets in that topic
@@ -102,10 +105,13 @@ def overall_figure():
             #Now we know how many retweets happened each 30 minutes (in v array)
             counter=0
             for i in v:#add the avg frequency of the tweet in the corresponding 30 minutes
-                values[counter]=values[counter]+i/float(len(retweet_time))
+                # values[counter]=values[counter]+i/float(len(retweet_time)) #<--for frequency of tweets
+                values[counter] = values[counter] + i #<--for getting the avg number of tweets
                 numOftweets[counter] = numOftweets[counter] + 1#keep track of how many tweets's retweets are in that position
                 counter=counter+1
-    #calculate average frequency of tweets in that time interval
+        else:
+            c=c-1
+    #calculate average "" of tweets in that time interval
     avg=[]
     counter=0
     for i in values:
@@ -116,13 +122,14 @@ def overall_figure():
         counter=counter+1
 
     #plot
+    avg=avg[:500] #trimming the list
     avg_np = np.array(avg)
-    plt.plot(avg_np,'b--')
-    plt.xlabel('Time')
-    plt.ylabel('# of retweets')
-    plt.ylim(0,0.005)
-    plt.xlim(0,750)
-    plt.title('retweets in time')
+    plt.plot(avg_np,'-')
+    plt.xlabel('Time(# of 30 mins intervals)')
+    plt.ylabel('Average # of retweets')
+    # plt.ylim(0,0.005)
+    # plt.xlim(0,750)
+    plt.title('Average propagation of FAKE news in Twitter')
     plt.show()
 #############################################
 
@@ -208,5 +215,5 @@ def individual_fugures():
     plt.suptitle("Propagation of FAKE news tweets")
     plt.show()
 
-# overall_figure()
-individual_fugures()
+overall_figure()
+# individual_fugures()
