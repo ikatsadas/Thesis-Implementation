@@ -10,7 +10,7 @@ import numpy as np
 # uri = "mongodb://user:SpYZ7EMlgs@snf-795686.vm.okeanos.grnet.gr:25"
 client = MongoClient('localhost', 27017)
 # client = MongoClient(uri)
-db = client['getMostRetweetedTest']
+db = client['getMostRetweetedFake']
 
 mins=30
 
@@ -189,7 +189,7 @@ def individual_fugures():
             #trim the list to a smaller time interval
             if(len(values)>30):
                 values=values[:30]
-            axarr[k, l].plot(values,'r--')
+            axarr[k, l].plot(values,'r')
             axarr[k, l].set_title(og_tweet_collection)
             # plt.subplot(2, 5, c)
             # plt.xticks(rotation=30)
@@ -205,6 +205,7 @@ def individual_fugures():
     for ax in f.axes:
         matplotlib.pyplot.sca(ax)
         plt.xticks(rotation=30)
+    plt.suptitle("Propagation of FAKE news tweets")
     plt.show()
 
 # overall_figure()
