@@ -1,36 +1,40 @@
-from datetime import datetime,timedelta
+from datetime import datetime, timedelta
 from pymongo import MongoClient
 import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 
 
-
 # uri = "mongodb://user:SpYZ7EMlgs@snf-795686.vm.okeanos.grnet.gr:25"
 # client = MongoClient(uri)
 client = MongoClient('localhost', 27017)
-fake='getMostRetweetedFake'
-real='getMostRetweetedTest'
+fake = 'getMostRetweetedFake'
+real = 'getMostRetweetedTest'
+db = client[fake]
+mins = 30  # number of minutes for the time interval
 
-mins=30# number of minutes for the time interval
 
-def plot_single_graph(arr,type,show):
+def plot_single_graph(arr, type, show, temp):
     # plot
     arr = arr[:500]  # trimming the list
     avg_np = np.array(arr)
-    plt.plot(avg_np, '-')
+    hndl, = plt.plot(avg_np, '-', label=type)
     plt.xlabel('Time(# of 30 mins intervals)')
     plt.ylabel('Average # of retweets')
     plt.ylim(0, 25)
     plt.xlim(0, 750)
-    title="Average propagation of {} news in Twitter"
+    title = "Average propagation of {} news in Twitter"
     plt.title(title.format(type))
+    if not show:
+        return hndl
+    plt.legend(handles=[hndl, temp])
     if show:
         plt.show()
 
-def extract_information(arr1,values,stop,operation):
-    if operation==3:
-        max_timeUnits=0
+
+def extract_information(arr1, values, stop, operation):
+    if operation == 3:
+        max_timeUnits = 0
     c = 0
     for og_tweet_collection in db.collection_names():  # for every tweet
         c = c + 1
@@ -57,10 +61,12 @@ def extract_information(arr1,values,stop,operation):
                 c_time = start_date + timedelta(minutes=mins * it)
                 x.append(c_time)  # store the start of every time interval in x array
                 it = it + 1
-            if operation==3:
-                if max_timeUnits<len(x):# initialization-get the biggest number of time intervals
+            if operation == 3:
+                if max_timeUnits < len(x):  # initialization-get the biggest number of time intervals
                     print max_timeUnits, "cahnged to ", len(x)
                     max_timeUnits = len(x)
+            elif operation == 4:
+                values.append(len(retweet_time))
             else:
                 # initialization
                 s = x[0]
@@ -83,16 +89,17 @@ def extract_information(arr1,values,stop,operation):
                                 flag = False
                     if e >= i >= s:
                         v[pointer] = v[pointer] + 1
-                if operation==1:
-                    operation_one(values,arr1,v)
+                if operation == 1:
+                    operation_one(values, arr1, v)
                 else:
-                    operation_two(v,retweet_time,arr1,c,og_tweet_collection)
+                    operation_two(v, retweet_time, arr1, c, og_tweet_collection)
         else:
             c = c - 1
-    if operation==3:
+    if operation == 3:
         return max_timeUnits
 
-def operation_one(values,numOftweets,v):
+
+def operation_one(values, numOftweets, v):
     # Now we know how many retweets happened each 30 minutes (in v array)
     counter = 0
     for i in v:  # add the avg frequency of the tweet in the corresponding 30 minutes
@@ -101,7 +108,8 @@ def operation_one(values,numOftweets,v):
         numOftweets[counter] = numOftweets[counter] + 1  # keep track of how many tweets's retweets are in that position
         counter = counter + 1
 
-def operation_two(values,retweet_time,axarr,c,og_tweet_collection):
+
+def operation_two(values, retweet_time, axarr, c, og_tweet_collection):
     counter = 0
     for i in values:
         values[counter] = i / float(len(retweet_time))
@@ -127,52 +135,62 @@ def operation_two(values,retweet_time,axarr,c,og_tweet_collection):
     # plt.plot_date(dates, values, 'r--')
     plt.subplots_adjust(left=None, bottom=None, right=None, top=None, wspace=0.1, hspace=0.2)
 
-def overall_figure(type,show):
-    #get the max_timeUnits number of a tweet propagation time (in 30 mins units)
-    print "Calc max_timeUnits"
-    max_timeUnits=extract_information([], [], 250, 3)#it will return the maximum number of time units needed
-    #initialization-create two lists values and numberOftweets and init them
-    values=[]
-    numOftweets=[]
-    for x in range(0, max_timeUnits):
-        values.append(0)#on each row it has the sum of the number of retweets in the (rowNum) half-hour
-        numOftweets.append(0)#on each row has the number of tweets participated in values in order to calculate the avg
 
-    extract_information(numOftweets,values,250,1)#it will run the appropriate operations (operation_one()) in order to return the arrays numOftweets and values
-    #calculate average "" of tweets in that time interval
-    avg=[]
-    counter=0
+def overall_figure(type, show, temp):
+    # get the max_timeUnits number of a tweet propagation time (in 30 mins units)
+    print "Calc max_timeUnits"
+    max_timeUnits = extract_information([], [], 250, 3)  # it will return the maximum number of time units needed
+    # initialization-create two lists values and numberOftweets and init them
+    values = []
+    numOftweets = []
+    for x in range(0, max_timeUnits):
+        values.append(0)  # on each row it has the sum of the number of retweets in the (rowNum) half-hour
+        numOftweets.append(
+            0)  # on each row has the number of tweets participated in values in order to calculate the avg
+
+    extract_information(numOftweets, values, 250,
+                        1)  # it will run the appropriate operations (operation_one()) in order to return the arrays numOftweets and values
+    # calculate average "" of tweets in that time interval
+    avg = []
+    counter = 0
     for i in values:
-        if numOftweets[counter]!=0:
-            avg.append(i/float(numOftweets[counter]))
+        if numOftweets[counter] != 0:
+            avg.append(i / float(numOftweets[counter]))
         else:
             avg.append(0)
-        counter=counter+1
-    plot_single_graph(avg,type,show)
+        counter = counter + 1
+    if show:
+        plot_single_graph(avg, type, show, temp)
+    else:
+        return plot_single_graph(avg, type, show, [])
 
-def initialize_group_plot(rows,columns):
+
+def initialize_group_plot(rows, columns):
     f, axarr = plt.subplots(rows, columns, sharex=True, sharey=True, figsize=(20, 8))
     matplotlib.rcParams.update({'font.size': 5})
-    return f,axarr
+    return f, axarr
 
-def show_group_plot(f,axarr,type):
+
+def show_group_plot(f, axarr, type):
     for ax in axarr.flat:
         ax.set(xlabel='# of 30 mins', ylabel='Frequency of retweets')
         ax.label_outer()
     for ax in f.axes:
         matplotlib.pyplot.sca(ax)
         plt.xticks(rotation=30)
-    title="Propagation of {} news tweets"
+    title = "Propagation of {} news tweets"
     plt.suptitle(title.format(type))
     plt.show()
 
+
 def individual_fugures(type):
-    f, axarr=initialize_group_plot(2,5)
+    f, axarr = initialize_group_plot(2, 5)
     extract_information(axarr, [], 10, 2)
-    show_group_plot(f,axarr,type)
+    show_group_plot(f, axarr, type)
+
 
 def graphs_of_verified_users(type):
-    f,axarr=initialize_group_plot(2, 5)
+    f, axarr = initialize_group_plot(2, 5)
     c = 0
     for og_tweet_collection in db.collection_names():  # for every tweet
         collection = db[og_tweet_collection]
@@ -253,20 +271,47 @@ def graphs_of_verified_users(type):
     show_group_plot(f, axarr, type)
 
 
+def cdf(type, show, temp):
+    ratios = []  # make an array of # of retweets/# of 30 minutes
+    extract_information([], ratios, 250, 4)  # operation 4(not yet implemented)
+    # ratios=ratios[:40]
+    # Prints the CDF diagram
+    hist, bin_edges = np.histogram(ratios, normed=True)
+    cdf = np.cumsum(hist)
+    hndl, = plt.plot(bin_edges[1:], cdf / cdf[-1], marker='.', label=type)
+    title = "Cumulative Distribution Function of {} news".format(type)
+    title = "Cumulative Distribution Function of fake/real news"
+    plt.xlabel('# of retweets')
+    plt.ylabel('Percent')
+    plt.ylim(0.6, 1.1)
+    # plt.xlim(0, 750)
+    plt.title(title)
+    if not show:
+        return hndl
+    plt.legend(handles=[hndl, temp])
+    if show:
+        plt.show()
 
-#~~~~~~~~~~~~~~~~~~~~~~~~~~
-db = client[fake]
-overall_figure("Fake",False)
-db = client[real]
-overall_figure("Real",True)
-#~~~~~~~~~~~~~~~~~~~~~~~~~~
-db = client[fake]
-individual_fugures("Fake")
-db = client[real]
-individual_fugures("Real")
-#~~~~~~~~~~~~~~~~~~~~~~~~~~
-db = client[fake]
-graphs_of_verified_users("Fake")
-db = client[real]
-graphs_of_verified_users("Real")
-#~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+# #~~~~~~~~~~~~~Overall~~~~~~~~~~~~~
+# db = client[fake]
+# temp=overall_figure("Fake",False,[])
+# db = client[real]
+# overall_figure("Real",True,temp)
+# #~~~~~~~~~~~~~Individual~~~~~~~~~~~~~
+# db = client[fake]
+# individual_fugures("Fake")
+# db = client[real]
+# individual_fugures("Real")
+# #~~~~~~~~~~~~~Verified Users~~~~~~~~~~~~~
+# db = client[fake]
+# graphs_of_verified_users("Fake")
+# db = client[real]
+# graphs_of_verified_users("Real")
+# #~~~~~~~~~~~~CDF~~~~~~~~~~~~~~
+# db = client[fake]
+# temp = cdf("fake", False, [])
+# db = client[real]
+# cdf("real", True, temp)
+
+
