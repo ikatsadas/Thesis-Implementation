@@ -9,7 +9,7 @@ import networkx as nx
 client = MongoClient('localhost', 27017)
 fake = 'getMostRetweetedFake'
 real = 'getMostRetweetedTest'
-db = client[real]
+db = client[fake]
 
 ACCESS_TOKEN = sys.argv[3]
 ACCESS_SECRET = sys.argv[4]
@@ -34,7 +34,7 @@ def get_followers(user_id, tweetnumber, retweeter_num, total_retweeters):
             users += user
             time.sleep(60)
     except tweepy.error.TweepError:
-        print "Error whilst geting the followers of user:",user_id
+        print ("Error whilst geting the followers of user:",user_id)
     return users
 
 
@@ -51,7 +51,7 @@ def get_friends(user_id, tweetnumber, retweeter_num, total_retweeters):
             users += user
             time.sleep(60)
     except tweepy.error.TweepError:
-        print "Error whilst geting the friends of user:",user_id
+        print ("Error whilst geting the friends of user:",user_id)
     return users
 
 
@@ -65,11 +65,9 @@ def extract_information_for_users(stop):
     alltheuserslist_flag_exists=True
     if collectionName.find({'all_the_users_list': {"$exists": True}}).count() == 0:
         alltheuserslist_flag_exists=False
-        print False
     specifictweetid_flag_exists = True
     if collectionName.find({'specific_tweet_id': {"$exists": True}}).count() == 0:
         specifictweetid_flag_exists = False
-        print False
 
     time.sleep(10)
 
@@ -105,18 +103,17 @@ def extract_information_for_users(stop):
             if len(user_connections) > 1:  # if the tweet had retweets
                 i = 0
                 for k in user_connections:  # for every user involved
-                    if(i==6):#JUST FOR TESTING
-                        user_set_of_a_tweet.add(k)  # add the user to the specific tweet's user set
-                        if str(k) not in user_set:  # if we havent examined this user
-                            # for every user_id get friends and followers
-                            user_followers = get_followers(k, c, i, len(user_connections))
-                            # user_friends = get_friends(k, c, i, len(user_connections))
-                            user_set.add(str(k))  # add that user to the general user set (EXAMINED)
-                            # SAVE TO DB
-                            user_dict = {}
-                            # user_dict["friends"]=user_friends
-                            user_dict["followers"] = user_followers
-                            allthe_users[str(k)] = user_dict
+                    user_set_of_a_tweet.add(k)  # add the user to the specific tweet's user set
+                    if str(k) not in user_set:  # if we havent examined this user
+                        # for every user_id get friends and followers
+                        user_followers = get_followers(k, c, i, len(user_connections))
+                        user_friends = get_friends(k, c, i, len(user_connections))
+                        user_set.add(str(k))  # add that user to the general user set (EXAMINED)
+                        # SAVE TO DB
+                        user_dict = {}
+                        user_dict["friends"]=user_friends
+                        user_dict["followers"] = user_followers
+                        allthe_users[str(k)] = user_dict
                     i = i + 1
                 spec_tweet_id= {og_tweet_collection: list(user_set_of_a_tweet)}
                 if specifictweetid_flag_exists:
@@ -148,14 +145,14 @@ def graph_generation(stop):
     G = nx.Graph()
     collection = db["users_info"]
     cursor = collection.find({"all_the_users_list":{ "$exists": True}})
-    for doc in cursor:
-        all_the_users=doc["all_the_users_list"]
-        print type(all_the_users)
-        print all_the_users
-        a=all_the_users["0"]
-        print "a"
-        print type(a)
-        print a["friends"]
+    # for doc in cursor:
+    #     all_the_users=doc["all_the_users_list"]
+    #     print type(all_the_users)
+    #     print all_the_users
+    #     a=all_the_users["0"]
+    #     print "a"
+    #     print type(a)
+    #     print a["friends"]
     # c = 0
     # for og_tweet_collection in db.collection_names():  # for every tweet
     #     c = c + 1
