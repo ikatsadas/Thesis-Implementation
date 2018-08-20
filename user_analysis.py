@@ -59,7 +59,7 @@ def extract_information_for_users(stop):
     try:
         db.create_collection('users_info')  # creates a collection with user's id
     except:
-        print ("The users_info collection existed allready")
+        print ("The users_info collection existed already")
     collectionName = db['users_info']
 
     alltheuserslist_flag_exists=True
@@ -69,7 +69,7 @@ def extract_information_for_users(stop):
     if collectionName.find({'specific_tweet_id': {"$exists": True}}).count() == 0:
         specifictweetid_flag_exists = False
     user_set = set()  # to check if we have examined this user
-    allthe_users = {}  #wil store the  user_dit{followers,firends} for each user to be saved in the DB
+    allthe_users = {}  #will store the  user_dit{followers,firends} for each user to be saved in the DB
     for og_tweet_collection in db.collection_names(): # initialize the all_users set, to avoid examining users that have already been examined
         if og_tweet_collection == "users_info":
             #get the current list of users and init it to the set
@@ -80,7 +80,9 @@ def extract_information_for_users(stop):
                 for key in dict.keys():
                     user_set.add(str(key))
     c = 0
+    flag=True
     for og_tweet_collection in db.collection_names():  # for every tweet
+        flag=True
         if og_tweet_collection != "users_info":#to avoid examining the users_info collection
             user_set_of_a_tweet = set()
             c = c + 1
@@ -89,56 +91,63 @@ def extract_information_for_users(stop):
             collection = db[og_tweet_collection]
             cursor = collection.find({})  # Gets the tweets in that topic
             user_connections = []
-            tweet = api.get_status(og_tweet_collection)
-            user_connections.append(tweet.user.id)
-            user_set_of_a_tweet.add(tweet.user.id)  # add the user to the specific tweet's user set
-            # get all the users on this tweet-chain
-            for document in cursor:
-                id = document["user"]["id"]
-                user_connections.append(id)
-            if len(user_connections) > 1:  # if the tweet had retweets
-                i = 0
-                for k in user_connections:  # for every user involved
-                    user_set_of_a_tweet.add(k)  # add the user to the specific tweet's user set
-                    if str(k) not in user_set:  # if we havent examined this user
-                        # for every user_id get friends and followers
-                        user_followers = get_followers(k, c, i, len(user_connections))
-                        user_friends = get_friends(k, c, i, len(user_connections))
-                        user_set.add(str(k))  # add that user to the general user set (EXAMINED)
-                        # SAVE TO DB
-                        user_dict = {}
-                        user_dict["friends"]=user_friends
-                        user_dict["followers"] = user_followers
-                        allthe_users[str(k)] = user_dict
-                    i = i + 1
-                spec_tweet_id= {og_tweet_collection: list(user_set_of_a_tweet)}
-                if specifictweetid_flag_exists:
-                    #update query (updating the existing document to that collection)
-                    name='specific_tweet_id'
-                    # for i in list(user_set_of_a_tweet):
-                    collectionName.update_one({'specific_tweet_id': {"$exists": True}},
-                                              # {'$push': {name:spec_tweet_id}})
-                        {'$push': {'specific_tweet_id': spec_tweet_id}})
+            try:
+                tweet = api.get_status(og_tweet_collection)
+                # print (tweet)
+                user_connections.append(tweet.user.id)
+                user_set_of_a_tweet.add(tweet.user.id)  # add the user to the specific tweet's user set
+            except:
+                flag=False
+                print("the folowing tweet id has a problem",og_tweet_collection)
+                pass
+            if flag:#if there is a problem with the original poster's account, dont examine anything for now
+                # get all the users on this tweet-chain
+                for document in cursor:
+                    id = document["user"]["id"]
+                    user_connections.append(id)
+                if len(user_connections) > 1:  # if the tweet had retweets
+                    i = 0
+                    for k in user_connections:  # for every user involved
+                        user_set_of_a_tweet.add(k)  # add the user to the specific tweet's user set
+                        if str(k) not in user_set:  # if we havent examined this user
+                            # for every user_id get friends and followers
+                            user_followers = get_followers(k, c, i, len(user_connections))
+                            user_friends = get_friends(k, c, i, len(user_connections))
+                            user_set.add(str(k))  # add that user to the general user set (EXAMINED)
+                            # SAVE TO DB
+                            user_dict = {}
+                            user_dict["friends"]=user_friends
+                            user_dict["followers"] = user_followers
+                            allthe_users[str(k)] = user_dict
+                        i = i + 1
+                    spec_tweet_id= {og_tweet_collection: list(user_set_of_a_tweet)}
+                    if specifictweetid_flag_exists:
+                        #update query (updating the existing document to that collection)
+                        name='specific_tweet_id'
+                        # for i in list(user_set_of_a_tweet):
+                        collectionName.update_one({'specific_tweet_id': {"$exists": True}},
+                                                  # {'$push': {name:spec_tweet_id}})
+                            {'$push': {'specific_tweet_id': spec_tweet_id}})
+                    else:
+                        #create query (inserting the document to that collection)
+                        l=[]
+                        l.append(spec_tweet_id)
+                        collectionName.insert_one({"specific_tweet_id": l})
+                        specifictweetid_flag_exists=True
                 else:
-                    #create query (inserting the document to that collection)
-                    l=[]
-                    l.append(spec_tweet_id)
-                    collectionName.insert_one({"specific_tweet_id": l})
-                    specifictweetid_flag_exists=True
-            else:
-                c = c - 1
-            if alltheuserslist_flag_exists:
-                # update query (updating the existing document to that collection)
-                # for i in allthe_users.keys():
-                for i in user_connections:
-                    name='all_the_users_list.'+str(i)
-                    collectionName.update_one({'all_the_users_list': {"$exists": True}},
-                                              # {'$push': {'all_the_users_list': allthe_users}})
-                                              {'$set': {name: allthe_users.get(str(i))}})
-            else:
-                # create query (inserting the document to that collection)
-                collectionName.insert_one({"all_the_users_list": allthe_users})
-                alltheuserslist_flag_exists=True
+                    c = c - 1
+                if alltheuserslist_flag_exists:
+                    # update query (updating the existing document to that collection)
+                    # for i in allthe_users.keys():
+                    for i in user_connections:
+                        name='all_the_users_list.'+str(i)
+                        collectionName.update_one({'all_the_users_list': {"$exists": True}},
+                                                  # {'$push': {'all_the_users_list': allthe_users}})
+                                                  {'$set': {name: allthe_users.get(str(i))}})
+                else:
+                    # create query (inserting the document to that collection)
+                    collectionName.insert_one({"all_the_users_list": allthe_users})
+                    alltheuserslist_flag_exists=True
 
 
 def graph_generation(stop):
@@ -228,13 +237,16 @@ def emailThis(to, subject="", body="", files=[]):
         return True
     except: traceback.print_exc()
 
-
+message= "This process had the pid: "+ str(os.getpid())
 try:
     # graph_generation(90)
+    print ("This process has the pid", os.getpid())
+    emailThis("johnkats5896@gmail.com", subject="Script Started",body="The script has starteded, chech the log file for more info!" + message)
     extract_information_for_users(90)
     # graph_generation(1)
-    emailThis("johnkats5896@gmail.com", subject="Script finished",body="The script has finished, chech the log file for more info")
+    emailThis("johnkats5896@gmail.com", subject="Script finished",body="The script has finished, chech the log file for more info!"+message)
 except:
-    emailThis("johnkats5896@gmail.com",subject="Crash Report",body="Check the script")
+    traceback.print_exc()
+    emailThis("johnkats5896@gmail.com",subject="Crash Report",body="Check the script!"+message+"\n"+traceback.format_exc())
 
 

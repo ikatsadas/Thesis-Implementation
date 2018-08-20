@@ -32,7 +32,7 @@ total=0
 for doc in cursor:
     print("     id: ",count_id)
     dict = doc["specific_tweet_id"]
-    if count_id != 5:
+    if count_id != 0:
         counter=0
         for key in dict.keys():
             counter=counter+1
@@ -49,6 +49,7 @@ for doc in cursor:
                 l=[]
                 l=item.get(str(k))
                 print("     --containing: ", len(l))
+                total = total + len(l)
     count_id=count_id+1
 print("_________________________________________________")
 print ("Total of: ",total)
