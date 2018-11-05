@@ -1,6 +1,10 @@
 import sys
 import os
 import traceback
+
+
+
+
 def emailThis(to, subject="", body="", files=[]):
     try:
         fro = "ykatsadas@gmail.com"
@@ -25,7 +29,7 @@ def emailThis(to, subject="", body="", files=[]):
         smtp = smtplib.SMTP("smtp.gmail.com",587)
         smtp.ehlo()
         smtp.starttls()
-        smtp.login(fro,sys.argv[5])#remove for git
+        smtp.login(fro,sys.argv[5])#argument no.5 is the password
         smtp.sendmail(fro, to, msg.as_string())
         smtp.close()
         return True

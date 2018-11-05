@@ -5,7 +5,6 @@ import numpy as np
 import collections
 import json
 
-# Replace the API_KEY and API_SECRET with your application's key and secret.
 
 ACCESS_TOKEN = sys.argv[3]
 ACCESS_SECRET = sys.argv[4]

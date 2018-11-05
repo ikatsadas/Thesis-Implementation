@@ -9,12 +9,6 @@ import requests
 import re
 import sys
 
-
-# Connection with Twitter
-# consumer_key = 'd4Sb0mUcvxc5d8YQBEYw8WPvD'
-# consumer_secret = '1kvxbAPlRD99GU19gTeBbqMKCAuZcQ4x68dzRipzJVpK0PUTCj'
-# access_token = '3451884743-1s8M0J5iFkMuC2Urr3YzUsXtkaY8a5xuqjdjCCG'
-# access_token_secret = 'GuoIHbguIGoblzU1IG7kkGYiU45kK6A2En80Ycc5a6Gzt'
 consumer_key = sys.argv[1]
 consumer_secret = sys.argv[2]
 access_token = sys.argv[3]
