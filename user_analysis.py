@@ -6,6 +6,9 @@ from pymongo import MongoClient
 import networkx as nx
 import random
 
+#This script gets all the friends and followers of the users who were involved in a tweet chain and saves them to mongo appropriatly, in respect to the API's limitations  (both mongo and twitter)
+
+
 client = MongoClient('localhost', 27017)
 fake = 'getMostRetweetedFake'
 real = 'getMostRetweeted3'

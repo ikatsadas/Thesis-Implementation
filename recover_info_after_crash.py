@@ -5,6 +5,8 @@ import time
 from pymongo import MongoClient
 import networkx as nx
 
+#This script was created to fix the broken structures and retrieve the lost data after a crash on the main script (out of date)
+
 
 client = MongoClient('localhost', 27017)
 fake = 'getMostRetweetedFake'

@@ -2,6 +2,8 @@ from pymongo import MongoClient
 import tweepy
 import sys
 
+#This script prints the current state of the DB in mongo because compass and shell are inconvenient
+
 client = MongoClient('localhost', 27017)
 fake = 'getMostRetweetedFake'
 real = 'getMostRetweetedTest'

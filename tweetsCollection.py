@@ -1,13 +1,14 @@
 # -*- coding: UTF-8 -*-
 # !/usr/bin/env python
 
-
 import tweepy
 import json
 from pymongo import MongoClient
 import requests
 import re
 import sys
+
+#This script was meant to stream tweets from certain accounts (has not been implemented further)
 
 consumer_key = sys.argv[1]
 consumer_secret = sys.argv[2]

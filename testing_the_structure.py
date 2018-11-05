@@ -5,6 +5,7 @@ import time
 from pymongo import MongoClient
 import networkx as nx
 
+#This script is probably useless now
 
 client = MongoClient('localhost', 27017)
 fake = 'getMostRetweetedFake'

@@ -5,6 +5,7 @@ import numpy as np
 import collections
 import json
 
+#This script gets the 10 most retweeted tweets of certain accounts and it saves those tweet chains in mongo
 
 ACCESS_TOKEN = sys.argv[3]
 ACCESS_SECRET = sys.argv[4]
@@ -83,7 +84,7 @@ for user in all_users:
 
     d = collections.Counter(my_dict)
 
-    # 5 most common (i.e. most retweeted)
+    # 10 most common (i.e. most retweeted)
     for k, v in d.most_common(10):
         print (k, v)
         get_retweets(k)

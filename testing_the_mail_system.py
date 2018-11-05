@@ -2,6 +2,7 @@ import sys
 import os
 import traceback
 
+#This script was created to test the mailing function in order to implement it to the main script, so that it could be more easily monitored
 
 
 
