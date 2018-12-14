@@ -3,6 +3,7 @@ from pymongo import MongoClient
 import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
+import math
 
 #This script is used to produce the majority of the plots and figures needed
 
@@ -10,49 +11,80 @@ import numpy as np
 # client = MongoClient(uri)
 client = MongoClient('localhost', 27017)
 fake = 'getMostRetweetedFake'
-real = 'getMostRetweeted3'
+real = 'getMostRetweetedTest'
 db = client[fake]
-mins = 15  # number of minutes for the time interval
+mins = 30  # number of minutes for the time interval
 savefiletype=".png"
+dir='figures/'
+subdir=' minutes/'
 
+twoDarrayForOperationFive=[]
+split_per_retweetNumber=100
+retweet_limit=500  # if the tweet had retweets or if the tweet had less than 500 retweets (keeping only under 500 retweets)
 
-def plot_single_graph(arr, type, show, temp,filename):
+#iteration_batches, on which batch we are on in this iteration, used to choose a different batch everytime from the collections (if split_per_retweetNumber is 0 then this parameter doesnt matter(default=0))
+#total_iterations, used in the case we want to split our dataset in batches (default=0)
+def plot_single_graph(arr, type, show, temp,filename,iteration_batches=0,total_iterations=0):
     # plot
     arr = arr[:500]  # trimming the list
     avg_np = np.array(arr)
     hndl, = plt.plot(avg_np, '-', label=type)
     plt.xlabel('Time (Sequence of {} mins intervals)'.format(mins))
-    plt.ylabel('Average # of retweets')
+    plt.ylabel('Average number of retweets')
     plt.ylim(0, 10)
     plt.xlim(0, 200)
-    title = "Average propagation of {} news in Twitter"
-    plt.title(title.format(type))
+    if total_iterations==0:#we DO NOT want to split it, we want it all
+        plt.title("Average propagation of news in Twitter")
+    else:#we want to split it
+        lower=iteration_batches * split_per_retweetNumber
+        upper=(iteration_batches + 1) * split_per_retweetNumber
+        if total_iterations==iteration_batches:
+            plt.title(
+                "Average propagation of news in Twitter, number of retweets=[" + str(lower) + "," + str(upper) + "]")
+        else:
+            plt.title("Average propagation of news in Twitter, number of retweets=["+str(lower)+","+str(upper)+")")
     if not show:
         return hndl
     plt.legend(handles=[hndl, temp])
     if show:
-        plt.savefig(filename.format(mins)+savefiletype)
+        if total_iterations == 0:  # we DO NOT want to split it, we want it all
+            plt.savefig(dir+str(mins)+subdir+filename.format(mins)+savefiletype)
+        else:  # we want to split it
+            plt.savefig(dir+str(mins)+subdir+filename.format(mins)+"_batchNum_"+str(iteration_batches+1) + savefiletype)
         plt.show()
 
-def plot_single_boxplot_graph(data, type,filename):
+def plot_single_boxplot_graph(data, type,filename,iteration_batches=0,total_iterations=0):
     fig,ax = plt.subplots()
     plt.xlabel('Time(sequence of {} mins intervals)'.format(mins))
     plt.ylabel('Number of retweets')
     plt.ylim(0, 100)
-    # plt.xlim(0, 750)
-    title = "Propagation of {} news in Twitter"
+    if total_iterations == 0:  # we DO NOT want to split it, we want it all
+        title = "Propagation of {} news in Twitter"
+    else:#we want to split it
+        lower=iteration_batches * split_per_retweetNumber
+        upper=(iteration_batches + 1) * split_per_retweetNumber
+        if total_iterations==iteration_batches:
+            title = "Propagation of {} news in Twitter, number of retweets=[" + str(lower) + "," + str(upper) + "]"
+        else:
+            title = "Propagation of {} news in Twitter, number of retweets=[" + str(lower) + "," + str(upper) + ")"
     filename=filename.format(mins)+"_"+type
     plt.title(title.format(type))
     ax.boxplot(data)
-    plt.savefig(filename+savefiletype)
+    if total_iterations == 0:  # we DO NOT want to split it, we want it all
+        plt.savefig(dir+str(mins)+subdir+filename + savefiletype)
+    else:  # we want to split it
+        plt.savefig(dir+str(mins)+subdir+filename + "_batchNum_" + str(iteration_batches + 1) + savefiletype)
     plt.show()
+
 
 #operation 1= fills the corresponding arrays : "arr1" with number of tweets involved in this time interval (position of the array), "values" with total retweets in this time interval (position of the array) ex. first 30 mins
 #operation 2=
 #operation 3= returns the max number of time intervals that need to be proccessed
 #operation 4=
 #operation 5= set the "values" array as a 2D array : rows= tweet1, tweet 2 etc. | coloumns=1st time interval, 2nd time interval etc.
-def extract_information(arr1, values, stop, operation):
+#iteration_batches, on which batch we are on in this iteration, used to choose a different batch everytime from the collections (if split_per_retweetNumber is 0 then this parameter doesnt matter(default=0))
+#total_iterations, used in the case we want to split our dataset in batches (default=0)
+def extract_information(arr1, values, stop, operation,iteration_batches=0,total_iterations=0):
     if operation == 3:
         max_timeUnits = 0
     c = 0
@@ -70,55 +102,65 @@ def extract_information(arr1, values, stop, operation):
                 dt = datetime.now()
                 dt = dt.strptime(s, '%a %b %d %H:%M:%S +0000 %Y')
                 retweet_time.append(dt)  # add the time of the retweet to an array
-            if len(retweet_time) != 0 and len(retweet_time)<=500:  # if the tweet had retweets or if the tweet had less than 500 retweets (keeping only under 500 retweets)
-                retweet_time = sorted(retweet_time)  # sort chronologically
-                # get the number of time intervals (of 30 minutes)
-                start_date = retweet_time[0]
-                end_date = retweet_time[-1]
-                c_time = start_date
-                x = []
-                it = 0
-                while (c_time <= end_date):
-                    c_time = start_date + timedelta(minutes=mins * it)
-                    x.append(c_time)  # store the start of every time interval in x array
-                    it = it + 1
-                #
-                if operation == 3:
-                    if max_timeUnits < len(x):  # initialization-get the biggest number of time intervals
-                        print max_timeUnits, "cahnged to ", len(x)
-                        max_timeUnits = len(x)
-                elif operation == 4:
-                    values.append(len(retweet_time))
+            flagg=True
+            if total_iterations == 0:#if we DO NOT want to split it in to batches
+                flagg = True# continue to process it, as normal
+            else:#if we DO want to split it in to batches
+                # continue to print the following batch
+                if ((iteration_batches * split_per_retweetNumber <= len(retweet_time)) and (iteration_batches + 1) * split_per_retweetNumber > len(retweet_time)) or (total_iterations == iteration_batches and len(retweet_time) == retweet_limit):
+                    flagg = True #continue
+                else:#not the current batch
+                    flagg = False #skip this batch
+            if flagg:
+                if len(retweet_time) != 0 and len(retweet_time)<=retweet_limit:  # if the tweet had retweets or if the tweet had less than 500 retweets (keeping only under 500 retweets)
+                    retweet_time = sorted(retweet_time)  # sort chronologically
+                    # get the number of time intervals (of 30 minutes)
+                    start_date = retweet_time[0]
+                    end_date = retweet_time[-1]
+                    c_time = start_date
+                    x = []
+                    it = 0
+                    while (c_time <= end_date):
+                        c_time = start_date + timedelta(minutes=mins * it)
+                        x.append(c_time)  # store the start of every time interval in x array
+                        it = it + 1
+                    #
+                    if operation == 3:
+                        if max_timeUnits < len(x):  # initialization-get the biggest number of time intervals
+                            print max_timeUnits, "cahnged to ", len(x)
+                            max_timeUnits = len(x)
+                    elif operation == 4:
+                        values.append(len(retweet_time))
+                    else:
+                        # initialization
+                        s = x[0]
+                        e = x[1]
+                        pointer = 0
+                        v = []
+                        for i in x:
+                            v.append(0)
+                        # fill v array with the number of retweets happened in a specific time interval
+                        for i in retweet_time:
+                            if i > e:
+                                flag = True
+                                while flag:
+                                    pointer = pointer + 1
+                                    if pointer > len(x) - 1:
+                                        break
+                                    s = x[pointer]
+                                    e = x[pointer + 1]
+                                    if e >= i >= s:
+                                        flag = False
+                            if e >= i >= s:
+                                v[pointer] = v[pointer] + 1
+                        if operation == 1:
+                            operation_one(values, arr1, v)
+                        elif operation==2:
+                            operation_two(v, retweet_time, arr1, c, og_tweet_collection)
+                        elif operation==5:
+                            twoDarrayForOperationFive.append(v)
                 else:
-                    # initialization
-                    s = x[0]
-                    e = x[1]
-                    pointer = 0
-                    v = []
-                    for i in x:
-                        v.append(0)
-                    # fill v array with the number of retweets happened in a specific time interval
-                    for i in retweet_time:
-                        if i > e:
-                            flag = True
-                            while flag:
-                                pointer = pointer + 1
-                                if pointer > len(x) - 1:
-                                    break
-                                s = x[pointer]
-                                e = x[pointer + 1]
-                                if e >= i >= s:
-                                    flag = False
-                        if e >= i >= s:
-                            v[pointer] = v[pointer] + 1
-                    if operation == 1:
-                        operation_one(values, arr1, v)
-                    elif operation==2:
-                        operation_two(v, retweet_time, arr1, c, og_tweet_collection)
-                    elif operation==5:
-                        twoDarrayForOperationFive.append(v)
-            else:
-                c = c - 1
+                    c = c - 1
     if operation == 3:
         return max_timeUnits
 
@@ -158,10 +200,14 @@ def operation_two(values, retweet_time, axarr, c, og_tweet_collection):
     # plt.plot_date(dates, values, 'r--')
     plt.subplots_adjust(left=None, bottom=None, right=None, top=None, wspace=0.1, hspace=0.2)
 
-def overall_figure(type, show, temp):
+#iteration and num_of_iterations are used in the case we want to split our dataset in to batches (default=0)
+def overall_figure(type, show, temp,iteration=0,num_of_iterations=0):
     # get the max_timeUnits number of a tweet propagation time (in 30 mins units)
     print "Calc max_timeUnits"
-    max_timeUnits = extract_information([], [], 250, 3)  # it will return the maximum number of time units needed
+    if num_of_iterations==0:#we dont want to split it into batches, we want ALL of it
+        max_timeUnits = extract_information([], [], 250, 3)  # it will return the maximum number of time units needed
+    else:#we want to split it into batches
+        max_timeUnits = extract_information([], [], 250, 3,iteration_batches=iteration,total_iterations=num_of_iterations)  # it will return the maximum number of time units needed
     # initialization-create two lists values and numberOftweets and init them
     values = []
     numOftweets = []
@@ -170,8 +216,11 @@ def overall_figure(type, show, temp):
         numOftweets.append(
             0)  # on each row has the number of tweets participated in values in order to calculate the avg
 
-    extract_information(numOftweets, values, 250,
-                        1)  # it will run the appropriate operations (operation_one()) in order to return the arrays numOftweets and values
+    if num_of_iterations == 0:  # we dont want to split it into batches, we want ALL of it
+        extract_information(numOftweets, values, 250,1)  # it will run the appropriate operations (operation_one()) in order to return the arrays numOftweets and values
+    else:#we want to split it into batches
+        extract_information(numOftweets, values, 250,
+                            1,iteration_batches=iteration,total_iterations=num_of_iterations)  # it will run the appropriate operations (operation_one()) in order to return the arrays numOftweets and values
     # calculate average "" of tweets in that time interval
     avg = []
     counter = 0
@@ -182,21 +231,34 @@ def overall_figure(type, show, temp):
             avg.append(0)
         counter = counter + 1
     if show:
-        plot_single_graph(avg, type, show, temp,filename='single_graph_overall_{}mins')
+        if num_of_iterations == 0:  # we dont want to split it into batches, we want ALL of it
+            plot_single_graph(avg, type, show, temp,filename='single_graph_overall_{}mins')
+        else:  # we want to split it into batches
+            plot_single_graph(avg, type, show, temp, filename='single_graph_overall_{}mins', iteration_batches = iteration, total_iterations = num_of_iterations)
     else:
-        return plot_single_graph(avg, type, show, [],filename='single_graph_overall_{}mins')
+        if num_of_iterations == 0:  # we dont want to split it into batches, we want ALL of it
+            return plot_single_graph(avg, type, show, [],filename='single_graph_overall_{}mins')
+        else:  # we want to split it into batches
+            return plot_single_graph(avg, type, show, [], filename='single_graph_overall_{}mins', iteration_batches = iteration, total_iterations = num_of_iterations)
 
-def overall_boxplot_figure(type):
+
+def overall_boxplot_figure(type,iteration=0,num_of_iterations=0):
     # get the max_timeUnits number of a tweet propagation time (in 30 mins units)
     print "Calc max_timeUnits"
-    max_timeUnits = extract_information([], [], 250, 3)  # it will return the maximum number of time units needed
+    if num_of_iterations == 0:  # we dont want to split it into batches, we want ALL of it
+        max_timeUnits = extract_information([], [], 250, 3)  # it will return the maximum number of time units needed
+    else:  # we want to split it into batches
+        max_timeUnits = extract_information([], [], 250, 3,iteration_batches=iteration,total_iterations=num_of_iterations)  # it will return the maximum number of time units needed
     # initialization-create two lists values and numberOftweets and init them
     values = []
     numOftweets = []
     for x in range(0, max_timeUnits):
         values.append(0)  # on each row it has the sum of the number of retweets in the (rowNum) half-hour
         numOftweets.append(0)  # on each row has the number of tweets participated in values in order to calculate the avg
-    extract_information(numOftweets, values, 250,5)
+    if num_of_iterations == 0:  # we dont want to split it into batches, we want ALL of it
+        extract_information(numOftweets, values, 250,5)
+    else:  # we want to split it into batches
+        extract_information(numOftweets, values, 250, 5,iteration_batches=iteration,total_iterations=num_of_iterations)
     #Make the twoDarrayForOperationFive in a n x n form (by trimming or completing)
     max=10# max number of time intervals depicted (max num of boxplots for each period of time)
     counter=0
@@ -214,7 +276,7 @@ def overall_boxplot_figure(type):
             twoDarrayForOperationFive[counter]=a
         counter=counter+1
     formatedData=zip(*twoDarrayForOperationFive) #transpose the array for the boxplot
-    plot_single_boxplot_graph(formatedData, type,filename='single_boxplot_graph_overall_{}mins')
+    plot_single_boxplot_graph(formatedData, type,filename='single_boxplot_graph_overall_{}mins',iteration_batches=iteration,total_iterations=num_of_iterations)
 
 def initialize_group_plot(rows, columns):
     f, axarr = plt.subplots(rows, columns, sharex=True, sharey=True, figsize=(20, 8))
@@ -233,7 +295,7 @@ def show_group_plot(f, axarr, type,filename,verifiedUsers):
     else:
         title = "Propagation of {} news tweets"
     plt.suptitle(title.format(type))
-    plt.savefig(filename+'_'+type + savefiletype)
+    plt.savefig(dir+str(mins)+subdir+filename+'_'+type + savefiletype)
     plt.show()
 
 def individual_fugures(type):
@@ -302,26 +364,40 @@ def graphs_of_verified_users(type):
     #################
     show_group_plot(f, axarr, type,filename='individual_figures_verified_users_{}mins'.format(mins),verifiedUsers=True)
 
-def cdf(type, show, temp):
+def cdf(type, show, temp,iteration=0,num_of_iterations=0):
     ratios = []  # make an array of # of retweets/# of 30 minutes
-    extract_information([], ratios, 250, 4)  # operation 4(not yet implemented)
+    if num_of_iterations == 0:  # we dont want to split it into batches, we want ALL of it
+        extract_information([], ratios, 250, 4)  # operation 4(not yet implemented)
+    else:  # we want to split it into batches
+        extract_information([], ratios, 250, 4,iteration_batches=iteration,total_iterations=num_of_iterations)  # operation 4(not yet implemented)
     # ratios=ratios[:40]
     # Prints the CDF diagram
     hist, bin_edges = np.histogram(ratios, normed=True)
     cdf = np.cumsum(hist)
     hndl, = plt.plot(bin_edges[1:], cdf / cdf[-1], marker='.', label=type)
-    title = "Cumulative Distribution Function of {} news".format(type)
-    title = "Cumulative Distribution Function of fake/real news"
+    if num_of_iterations == 0:  # we dont want to split it into batches, we want ALL of it
+        title = "Cumulative Distribution Function of news"
+    else:  # we want to split it
+        lower = iteration * split_per_retweetNumber
+        upper = (iteration + 1) * split_per_retweetNumber
+        if num_of_iterations == iteration:
+            title = "Cumulative Distribution Function of news, number of retweets=[" + str(lower) + "," + str(upper) + "]"
+        else:
+            title = "Cumulative Distribution Function of news, number of retweets=[" + str(lower) + "," + str(upper) + ")"
+
     plt.xlabel('# of retweets')
     plt.ylabel('Percent')
-    plt.ylim(0.6, 1.1)
+    # plt.ylim(0.6, 1.1)
     # plt.xlim(0, 750)
     plt.title(title)
     if not show:
         return hndl
     plt.legend(handles=[hndl, temp])
     if show:
-        plt.savefig('cdf'+ savefiletype)
+        if num_of_iterations == 0:  # we DO NOT want to split it, we want it all
+            plt.savefig(dir+'cdf' + savefiletype)
+        else:  # we want to split it
+            plt.savefig(dir+'cdf' +"_batchNum_"+str(iteration+1) + savefiletype)
         plt.show()
 
 def friend_follower_ratio(typeNews, show, temp):
@@ -363,7 +439,7 @@ def friend_follower_ratio(typeNews, show, temp):
         return hndl
     plt.legend(handles=[hndl, temp])
     if show:
-        plt.savefig('friends_followers_ratio_'+typeNews + savefiletype)
+        plt.savefig(dir+'friends_followers_ratio_'+typeNews + savefiletype)
         plt.show()
 
 def completion_DB_processing(type,comparisson_set):
@@ -427,7 +503,7 @@ def completion_DB_processing(type,comparisson_set):
     plt.title(title.format(type))
     # plt.legend(handles=[hndl, temp])
     title="completion_stats_"+type
-    plt.savefig(title+savefiletype)
+    plt.savefig(dir+title+savefiletype)
     plt.show()
 
     print len(comparisson_set), "comparisson_set length"
@@ -442,18 +518,38 @@ def completion_DB_processing(type,comparisson_set):
     else:
         return comparisson_set
 
-# #~~~~~~~~~~~~~Overall~~~~~~~~~~~~~ 1 figure
-# db = client[fake]
-# temp=overall_figure("Fake",False,[])
-# db = client[real]
-# overall_figure("Real",True,temp)
-# #~~~~~~~~~~~~~Overall with Boxplots~~~~~~~~~~~~~ 2 figures
-twoDarrayForOperationFive=[] #leave this out of the comments - it might cause errors
-# db = client[fake]
-# overall_boxplot_figure("Fake")
-# twoDarrayForOperationFive=[]
-# db = client[real]
-# overall_boxplot_figure("Real")
+#~~~~~~~~~~~~~Overall~~~~~~~~~~~~~ 1 figure
+db = client[fake]
+temp=overall_figure("Fake",False,[])
+db = client[real]
+overall_figure("Real",True,temp)
+#~~~~~~~~~~~~~Overall In Batches~~~~~~~~~~~~~ Multiple figure
+num_of_iterations=(retweet_limit/split_per_retweetNumber)-1#has to calculate the number of batched it will create
+iter=0
+while(iter<=num_of_iterations):
+    db = client[fake]
+    temp=overall_figure("Fake",False,[],iteration=iter,num_of_iterations=num_of_iterations)
+    db = client[real]
+    overall_figure("Real",True,temp,iteration=iter,num_of_iterations=num_of_iterations)
+    iter = iter + 1
+#~~~~~~~~~~~~~Overall with Boxplots~~~~~~~~~~~~~ 2 figures
+twoDarrayForOperationFive=[]
+db = client[fake]
+overall_boxplot_figure("Fake")
+twoDarrayForOperationFive=[]
+db = client[real]
+overall_boxplot_figure("Real")
+#~~~~~~~~~~~~~Overall with Boxplots with bathces~~~~~~~~~~~~~Multiple figures
+num_of_iterations=(retweet_limit/split_per_retweetNumber)-1#has to calculate the number of batched it will create
+iter=0
+while(iter<=num_of_iterations):
+    twoDarrayForOperationFive=[]
+    db = client[fake]
+    overall_boxplot_figure("Fake",iteration=iter,num_of_iterations=num_of_iterations)
+    twoDarrayForOperationFive=[]
+    db = client[real]
+    overall_boxplot_figure("Real",iteration=iter,num_of_iterations=num_of_iterations)
+    iter = iter + 1
 # #~~~~~~~~~~~~~Individual~~~~~~~~~~~~~ 2 figures
 # db = client[fake]
 # individual_fugures("Fake")
@@ -469,14 +565,23 @@ twoDarrayForOperationFive=[] #leave this out of the comments - it might cause er
 # temp = cdf("fake", False, [])
 # db = client[real]
 # cdf("real", True, temp)
+# #~~~~~~~~~~~~CDF with batches~~~~~~~~~~~~~~ Multiple figure
+# num_of_iterations=(retweet_limit/split_per_retweetNumber)-1#has to calculate the number of batched it will create
+# iter=0
+# while(iter<=num_of_iterations):
+#     db = client[fake]
+#     temp = cdf("fake", False, [],iteration=iter,num_of_iterations=num_of_iterations)
+#     db = client[real]
+#     cdf("real", True, temp,iteration=iter,num_of_iterations=num_of_iterations)
+#     iter = iter + 1
 # #~~~~~~~~~~~~Friends/Followers Ratio~~~~~~~~~~~~~~ 1 figure
 # db = client[fake]
 # temp = friend_follower_ratio("fake", False, [])
 # db = client[real]
 # friend_follower_ratio("real", True, temp)
 # #~~~~~~~~~~~~Completion of DB processing~~~~~~~~~~~~~~ 2 figures
-comparisson_set=set()
-db = client[fake]
-comparisson_set=completion_DB_processing("Fake",comparisson_set)
-db = client[real]
-completion_DB_processing("Real",comparisson_set)
+# comparisson_set=set()
+# db = client[fake]
+# comparisson_set=completion_DB_processing("Fake",comparisson_set)
+# db = client[real]
+# completion_DB_processing("Real",comparisson_set)

@@ -5,8 +5,8 @@ import tweepy
 import matplotlib.pyplot as plt
 
 client = MongoClient('localhost', 27017)
-fake = 'getMostRetweetedFake'
-real = 'getMostRetweeted3'
+fake = 'getMostRetweetedFakeFinished'
+real = 'getMostRetweeted2'
 db = client[fake]
 
 ACCESS_TOKEN = sys.argv[3]
@@ -145,7 +145,7 @@ def graph_generation_basedOn_tweet(stop):
                 # generate positions for the nodes
                 print"drawing"
                 print sourceName,len(G.nodes)
-                nx.write_edgelist(G, "TweetGraph_{}.csv".format(str(sourceName)), data=False)
+                nx.write_edgelist(G, "TweetGraph_{}.csv".format(str(sourceName)+"_"+str(tweetKey)), data=False)
                 pos = nx.random_layout(G)  # positions for all nodes
                 nx.draw_networkx_nodes(G, pos,nodelist=nodes,node_color='r',node_size=10,alpha=0.8)
                 nx.draw_networkx_nodes(G, pos,nodelist=[source],node_color='b',node_size=50,alpha=0.8)
@@ -321,15 +321,15 @@ def graph_generation_basedOn_tweet_with_hops(stop):
 
 #--------------------EXECUTION----------------------
 #______________Network of a single tweet____________
-db = client[fake]
-graph_generation_basedOn_tweet(0)
+# db = client[fake]
+# graph_generation_basedOn_tweet(0)
 db = client[real]
 graph_generation_basedOn_tweet(0)
 #___________________________________________________
 #________Network of a single tweet with hops________
-db = client[fake]
-graph_generation_basedOn_tweet_with_hops(0)
-db = client[real]
-graph_generation_basedOn_tweet_with_hops(0)
+# db = client[fake]
+# graph_generation_basedOn_tweet_with_hops(0)
+# db = client[real]
+# graph_generation_basedOn_tweet_with_hops(0)
 #___________________________________________________
 #---------------------------------------------------

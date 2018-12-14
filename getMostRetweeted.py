@@ -4,6 +4,8 @@ from pymongo import MongoClient
 import numpy as np
 import collections
 import json
+from bson.json_util import loads
+from bson.json_util import dumps as bsondumps
 
 #This script gets the 10 most retweeted tweets of certain accounts and it saves those tweet chains in mongo
 
@@ -25,6 +27,33 @@ db = client['getMostRetweetedFake']
 data = np.loadtxt("fake_news.txt", dtype=str)
 all_users = data[:, :]
 
+def getAlreadyExaminedUsers():
+    allUsersExamined=[]
+    i=0
+    for og_tweet_collection in db.collection_names():
+        if og_tweet_collection != "users_info":
+            try:
+                tweet = api.get_status(og_tweet_collection)
+                userID=str(tweet.user.id)
+                if userID not in allUsersExamined:
+                    allUsersExamined.append(userID)
+            except:
+                collection = db[og_tweet_collection]
+                cursor = collection.find({})
+                if cursor.count() ==0:
+                    print("the folowing tweet id has a problem", og_tweet_collection)
+                    i=i+1
+                else:
+                    retweet=cursor.next()
+                    jsonDumpsTweet=bsondumps(retweet)
+                    jsonDumpsTweet = loads(jsonDumpsTweet)
+                    userID=str(jsonDumpsTweet["retweeted_status"]["user"]["id"])
+                    if userID not in allUsersExamined:
+                        allUsersExamined.append(userID)
+                pass
+    print "In total,",i,"tweets where not available now."
+    print "There have been examined",len(allUsersExamined)," users already."
+    return allUsersExamined
 
 def get_retweets(initial_id):
     try:
@@ -68,24 +97,27 @@ def get_recent_tweets(target):
             break
 
 
+examinedUsers=getAlreadyExaminedUsers()
 for user in all_users:
     tweet_ids = []
     my_dict = {}
-    #mylist = db[user[1]].find({})  # get ALL the tweets from that user (that are saved)
-    mylist=[]
-    # print type(user[1])
-    get_recent_tweets(user[1])
+    if user[1] not in examinedUsers:
+        print user[0], "has never been examined!"
+        mylist=[]
+        get_recent_tweets(user[1])
 
-    # make a dictionary
-    for item in mylist:
-        datajson = json.dumps(item._json)
-        datajson=json.loads(datajson)
-        my_dict.update({datajson["id_str"]: datajson["retweet_count"]})
+        # make a dictionary
+        for item in mylist:
+            datajson = json.dumps(item._json)
+            datajson=json.loads(datajson)
+            my_dict.update({datajson["id_str"]: datajson["retweet_count"]})
 
-    d = collections.Counter(my_dict)
+        d = collections.Counter(my_dict)
 
-    # 10 most common (i.e. most retweeted)
-    for k, v in d.most_common(10):
-        print (k, v)
-        get_retweets(k)
-    print
+        # 10 most common (i.e. most retweeted)
+        for k, v in d.most_common(10):
+            print (k, v)
+            get_retweets(k)
+        print
+    else:
+        print user[0],"had already been examined!"

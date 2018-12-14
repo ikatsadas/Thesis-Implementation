@@ -14,8 +14,9 @@ fake = 'getMostRetweetedFake'
 real = 'getMostRetweeted3'
 db = client[fake]
 
+
 RTthreshold=500
-mongoThresholdPerDoc=500000 #(actual 600000, but just in case of crashing we have 500K)
+mongoThresholdPerDoc=300000 #(actual 600000, but just in case of crashing we have 500K)
 
 ACCESS_TOKEN = sys.argv[3]
 ACCESS_SECRET = sys.argv[4]
@@ -366,8 +367,8 @@ try:
     print ("This process has the pid", os.getpid())
     emailThis("johnkats5896@gmail.com", subject="Script Started",
               body="The script has starteded, check the log file for more info!" + message)
-    # extract_information_for_users(90)
-    # emailThis("johnkats5896@gmail.com", subject="Script pt 1 finished", body="The first part of the script has finished, chech the log file for more info! Now it will continue to the next segment!" + message)
+    extract_information_for_users(300)
+    emailThis("johnkats5896@gmail.com", subject="Script pt 1 finished", body="The first part of the script has finished, chech the log file for more info! Now it will continue to the next segment!" + message)
     db = client[real]
     extract_information_for_users(300)
     emailThis("johnkats5896@gmail.com", subject="Script finished",
@@ -376,3 +377,5 @@ except:
     traceback.print_exc()
     emailThis("johnkats5896@gmail.com", subject="Crash Report",
               body="Check the script!" + message + "\n" + traceback.format_exc())
+
+
