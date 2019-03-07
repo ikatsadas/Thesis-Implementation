@@ -7,7 +7,7 @@ import json
 from bson.json_util import loads
 from bson.json_util import dumps as bsondumps
 
-#This script gets the 10 most retweeted tweets of certain accounts and it saves those tweet chains in mongo
+#This script gets the 10 most retweeted tweets of certain accounts and it saves those tweet-chains in mongoDB
 
 ACCESS_TOKEN = sys.argv[3]
 ACCESS_SECRET = sys.argv[4]
@@ -20,10 +20,9 @@ api = tweepy.API(auth,retry_count=10, retry_delay=5, retry_errors=set([103]), wa
                  wait_on_rate_limit_notify=True)
 
 client = MongoClient('localhost', 27017)
-db = client['getMostRetweetedFake']
+db = client['nameDB']
 
 # load accounts
-# data = np.loadtxt("C:/Users/johnk/Desktop/thesis/remoteDevelopment/fake_news.txt", dtype=str)
 data = np.loadtxt("fake_news.txt", dtype=str)
 all_users = data[:, :]
 

@@ -3,11 +3,11 @@ import tweepy
 import sys
 import numpy as np
 
-#This script prints the current state of the DB in mongo because compass and shell are inconvenient and can provide a scatter plot
+#This script prints the current state of the DB in mongo because compass and shell are inconvenient.It can also provide a scatter plot of those accounts
 
 client = MongoClient('localhost', 27017)
-fake = 'getMostRetweetedFake'
-real = 'getMostRetweeted3'
+fake = 'nameDB'
+real = 'nameDB'
 db = client[fake]
 
 ACCESS_TOKEN = sys.argv[3]

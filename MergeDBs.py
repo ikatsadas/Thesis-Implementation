@@ -1,10 +1,8 @@
-#This script is to merge to similar collections in mongo (union)
+#This script is to merge to similar collections in mongo (union), was used partially only for fixing problems within the DB
 import sys
 import tweepy
 from pymongo import MongoClient
 import numpy as np
-import collections
-import json
 from bson.json_util import loads
 from bson.json_util import dumps as bsondumps
 
@@ -21,8 +19,8 @@ api = tweepy.API(auth,retry_count=10, retry_delay=5, retry_errors=set([103]), wa
 client = MongoClient('localhost', 27017)
 fake_news_users_file="fake_news.txt"
 real_news_users_file="real_news.txt"
-db1_name='getMostRetweeted2'
-db2_name='getMostRetweetedTest'
+db1_name='nameDB'
+db2_name='nameDB'
 db1 = client[db1_name]
 db2=client[db2_name]
 

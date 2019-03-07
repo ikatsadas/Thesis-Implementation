@@ -3,18 +3,30 @@ from pymongo import MongoClient
 import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
-import math
+import matplotlib.patches as mpatches
+import seaborn as sns
+import pandas as pd
+from sklearn import preprocessing
+import sys
+import tweepy
 
 #This script is used to produce the majority of the plots and figures needed
 
-# uri = "mongodb://user:SpYZ7EMlgs@snf-795686.vm.okeanos.grnet.gr:25"
-# client = MongoClient(uri)
+ACCESS_TOKEN = sys.argv[3]
+ACCESS_SECRET = sys.argv[4]
+CONSUMER_KEY = sys.argv[1]
+CONSUMER_SECRET = sys.argv[2]
+auth = tweepy.AppAuthHandler(CONSUMER_KEY, CONSUMER_SECRET)
+
+api = tweepy.API(auth, retry_count=10, retry_delay=5, retry_errors=set([103]), wait_on_rate_limit=True,
+                 wait_on_rate_limit_notify=True)
+
 client = MongoClient('localhost', 27017)
-fake = 'getMostRetweetedFake'
-real = 'getMostRetweetedTest'
+fake = 'nameDB'
+real = 'nameDB'
 db = client[fake]
 mins = 30  # number of minutes for the time interval
-savefiletype=".png"
+savefiletype=".svg"
 dir='figures/'
 subdir=' minutes/'
 
@@ -24,15 +36,21 @@ retweet_limit=500  # if the tweet had retweets or if the tweet had less than 500
 
 #iteration_batches, on which batch we are on in this iteration, used to choose a different batch everytime from the collections (if split_per_retweetNumber is 0 then this parameter doesnt matter(default=0))
 #total_iterations, used in the case we want to split our dataset in batches (default=0)
-def plot_single_graph(arr, type, show, temp,filename,iteration_batches=0,total_iterations=0):
+def plot_single_graph(arr, type, show,ytitle, temp,counter_of_tweets_examined,filename,iteration_batches=0,total_iterations=0,y_lim=(0,10),x_lim=(0,200)):
     # plot
     arr = arr[:500]  # trimming the list
+    if ytitle=='Percentage change number of retweets' and not show:
+        plt.axhline(y=0, color='crimson')#to place a red line on y=0
     avg_np = np.array(arr)
-    hndl, = plt.plot(avg_np, '-', label=type)
+    if show:
+        hndl, = plt.plot(avg_np, '-', label=type + str(" news tweets"), alpha=0.7)
+    else:
+        hndl, = plt.plot(avg_np, '-', label=type + str(" news tweets"))
     plt.xlabel('Time (Sequence of {} mins intervals)'.format(mins))
-    plt.ylabel('Average number of retweets')
-    plt.ylim(0, 10)
-    plt.xlim(0, 200)
+    plt.ylabel(ytitle)
+
+    plt.ylim(y_lim)
+    plt.xlim(x_lim)
     if total_iterations==0:#we DO NOT want to split it, we want it all
         plt.title("Average propagation of news in Twitter")
     else:#we want to split it
@@ -44,8 +62,8 @@ def plot_single_graph(arr, type, show, temp,filename,iteration_batches=0,total_i
         else:
             plt.title("Average propagation of news in Twitter, number of retweets=["+str(lower)+","+str(upper)+")")
     if not show:
-        return hndl
-    plt.legend(handles=[hndl, temp])
+        return [hndl,mpatches.Patch(color=hndl.get_color(), label='Number of '+type+' news tweets '+str(counter_of_tweets_examined))]
+    plt.legend(handles=[hndl, temp[0],mpatches.Patch(color=hndl.get_color(), label='Number of '+type+' news tweets '+str(counter_of_tweets_examined)),temp[1]])
     if show:
         if total_iterations == 0:  # we DO NOT want to split it, we want it all
             plt.savefig(dir+str(mins)+subdir+filename.format(mins)+savefiletype)
@@ -57,7 +75,7 @@ def plot_single_boxplot_graph(data, type,filename,iteration_batches=0,total_iter
     fig,ax = plt.subplots()
     plt.xlabel('Time(sequence of {} mins intervals)'.format(mins))
     plt.ylabel('Number of retweets')
-    plt.ylim(0, 100)
+    plt.ylim(0, 80)
     if total_iterations == 0:  # we DO NOT want to split it, we want it all
         title = "Propagation of {} news in Twitter"
     else:#we want to split it
@@ -70,17 +88,15 @@ def plot_single_boxplot_graph(data, type,filename,iteration_batches=0,total_iter
     filename=filename.format(mins)+"_"+type
     plt.title(title.format(type))
     ax.boxplot(data)
+    plt.xticks(rotation=45)
     if total_iterations == 0:  # we DO NOT want to split it, we want it all
         plt.savefig(dir+str(mins)+subdir+filename + savefiletype)
     else:  # we want to split it
         plt.savefig(dir+str(mins)+subdir+filename + "_batchNum_" + str(iteration_batches + 1) + savefiletype)
     plt.show()
 
-
 #operation 1= fills the corresponding arrays : "arr1" with number of tweets involved in this time interval (position of the array), "values" with total retweets in this time interval (position of the array) ex. first 30 mins
-#operation 2=
 #operation 3= returns the max number of time intervals that need to be proccessed
-#operation 4=
 #operation 5= set the "values" array as a 2D array : rows= tweet1, tweet 2 etc. | coloumns=1st time interval, 2nd time interval etc.
 #iteration_batches, on which batch we are on in this iteration, used to choose a different batch everytime from the collections (if split_per_retweetNumber is 0 then this parameter doesnt matter(default=0))
 #total_iterations, used in the case we want to split our dataset in batches (default=0)
@@ -88,6 +104,7 @@ def extract_information(arr1, values, stop, operation,iteration_batches=0,total_
     if operation == 3:
         max_timeUnits = 0
     c = 0
+    counter_of_tweets_examined=0
     for og_tweet_collection in db.collection_names():  # for every tweet
         c = c + 1
         if c > stop:
@@ -113,6 +130,7 @@ def extract_information(arr1, values, stop, operation,iteration_batches=0,total_
                     flagg = False #skip this batch
             if flagg:
                 if len(retweet_time) != 0 and len(retweet_time)<=retweet_limit:  # if the tweet had retweets or if the tweet had less than 500 retweets (keeping only under 500 retweets)
+                    counter_of_tweets_examined = counter_of_tweets_examined + 1
                     retweet_time = sorted(retweet_time)  # sort chronologically
                     # get the number of time intervals (of 30 minutes)
                     start_date = retweet_time[0]
@@ -162,7 +180,7 @@ def extract_information(arr1, values, stop, operation,iteration_batches=0,total_
                 else:
                     c = c - 1
     if operation == 3:
-        return max_timeUnits
+        return max_timeUnits,counter_of_tweets_examined
 
 def operation_one(values, numOftweets, v):
     # Now we know how many retweets happened each 30 minutes (in v array)
@@ -205,9 +223,9 @@ def overall_figure(type, show, temp,iteration=0,num_of_iterations=0):
     # get the max_timeUnits number of a tweet propagation time (in 30 mins units)
     print "Calc max_timeUnits"
     if num_of_iterations==0:#we dont want to split it into batches, we want ALL of it
-        max_timeUnits = extract_information([], [], 250, 3)  # it will return the maximum number of time units needed
+        max_timeUnits,counter_of_tweets_examined = extract_information([], [], 500, 3)  # it will return the maximum number of time units needed
     else:#we want to split it into batches
-        max_timeUnits = extract_information([], [], 250, 3,iteration_batches=iteration,total_iterations=num_of_iterations)  # it will return the maximum number of time units needed
+        max_timeUnits,counter_of_tweets_examined = extract_information([], [], 500, 3,iteration_batches=iteration,total_iterations=num_of_iterations)  # it will return the maximum number of time units needed
     # initialization-create two lists values and numberOftweets and init them
     values = []
     numOftweets = []
@@ -217,9 +235,9 @@ def overall_figure(type, show, temp,iteration=0,num_of_iterations=0):
             0)  # on each row has the number of tweets participated in values in order to calculate the avg
 
     if num_of_iterations == 0:  # we dont want to split it into batches, we want ALL of it
-        extract_information(numOftweets, values, 250,1)  # it will run the appropriate operations (operation_one()) in order to return the arrays numOftweets and values
+        extract_information(numOftweets, values, 500,1)  # it will run the appropriate operations (operation_one()) in order to return the arrays numOftweets and values
     else:#we want to split it into batches
-        extract_information(numOftweets, values, 250,
+        extract_information(numOftweets, values, 500,
                             1,iteration_batches=iteration,total_iterations=num_of_iterations)  # it will run the appropriate operations (operation_one()) in order to return the arrays numOftweets and values
     # calculate average "" of tweets in that time interval
     avg = []
@@ -230,25 +248,26 @@ def overall_figure(type, show, temp,iteration=0,num_of_iterations=0):
         else:
             avg.append(0)
         counter = counter + 1
+    xlim = 0
+    ylim = 0
     if show:
         if num_of_iterations == 0:  # we dont want to split it into batches, we want ALL of it
-            plot_single_graph(avg, type, show, temp,filename='single_graph_overall_{}mins')
+            plot_single_graph(avg, type, show,'Average number of retweets', temp,counter_of_tweets_examined,filename='single_graph_overall_{}mins',y_lim=ylim,x_lim=xlim)
         else:  # we want to split it into batches
-            plot_single_graph(avg, type, show, temp, filename='single_graph_overall_{}mins', iteration_batches = iteration, total_iterations = num_of_iterations)
+            plot_single_graph(avg, type, show,'Average number of retweets', temp,counter_of_tweets_examined, filename='single_graph_overall_{}mins', iteration_batches = iteration, total_iterations = num_of_iterations,y_lim=0,x_lim=0)
     else:
         if num_of_iterations == 0:  # we dont want to split it into batches, we want ALL of it
-            return plot_single_graph(avg, type, show, [],filename='single_graph_overall_{}mins')
+            return plot_single_graph(avg, type, show,'Average number of retweets', [],counter_of_tweets_examined,filename='single_graph_overall_{}mins',y_lim=ylim,x_lim=xlim)
         else:  # we want to split it into batches
-            return plot_single_graph(avg, type, show, [], filename='single_graph_overall_{}mins', iteration_batches = iteration, total_iterations = num_of_iterations)
-
+            return plot_single_graph(avg, type, show,'Average number of retweets', [],counter_of_tweets_examined, filename='single_graph_overall_{}mins', iteration_batches = iteration, total_iterations = num_of_iterations,y_lim=0,x_lim=0)
 
 def overall_boxplot_figure(type,iteration=0,num_of_iterations=0):
     # get the max_timeUnits number of a tweet propagation time (in 30 mins units)
     print "Calc max_timeUnits"
     if num_of_iterations == 0:  # we dont want to split it into batches, we want ALL of it
-        max_timeUnits = extract_information([], [], 250, 3)  # it will return the maximum number of time units needed
+        max_timeUnits,counter_of_tweets_examined = extract_information([], [], 500, 3)  # it will return the maximum number of time units needed
     else:  # we want to split it into batches
-        max_timeUnits = extract_information([], [], 250, 3,iteration_batches=iteration,total_iterations=num_of_iterations)  # it will return the maximum number of time units needed
+        max_timeUnits,counter_of_tweets_examined = extract_information([], [], 500, 3,iteration_batches=iteration,total_iterations=num_of_iterations)  # it will return the maximum number of time units needed
     # initialization-create two lists values and numberOftweets and init them
     values = []
     numOftweets = []
@@ -256,11 +275,11 @@ def overall_boxplot_figure(type,iteration=0,num_of_iterations=0):
         values.append(0)  # on each row it has the sum of the number of retweets in the (rowNum) half-hour
         numOftweets.append(0)  # on each row has the number of tweets participated in values in order to calculate the avg
     if num_of_iterations == 0:  # we dont want to split it into batches, we want ALL of it
-        extract_information(numOftweets, values, 250,5)
+        extract_information(numOftweets, values, 500,5)
     else:  # we want to split it into batches
-        extract_information(numOftweets, values, 250, 5,iteration_batches=iteration,total_iterations=num_of_iterations)
+        extract_information(numOftweets, values, 500, 5,iteration_batches=iteration,total_iterations=num_of_iterations)
     #Make the twoDarrayForOperationFive in a n x n form (by trimming or completing)
-    max=10# max number of time intervals depicted (max num of boxplots for each period of time)
+    max=40# max number of time intervals depicted (max num of boxplots for each period of time)
     counter=0
     for i in twoDarrayForOperationFive:
         dif = max - len(i)
@@ -270,7 +289,7 @@ def overall_boxplot_figure(type,iteration=0,num_of_iterations=0):
                 a.append(0)
             twoDarrayForOperationFive[counter]=a
         elif dif<0:#trimming
-            a=i[:10]
+            a=i[:40]
             for x in range(dif):
                 a.append(0)
             twoDarrayForOperationFive[counter]=a
@@ -367,9 +386,9 @@ def graphs_of_verified_users(type):
 def cdf(type, show, temp,iteration=0,num_of_iterations=0):
     ratios = []  # make an array of # of retweets/# of 30 minutes
     if num_of_iterations == 0:  # we dont want to split it into batches, we want ALL of it
-        extract_information([], ratios, 250, 4)  # operation 4(not yet implemented)
+        extract_information([], ratios, 500, 4)  # operation 4(not yet implemented)
     else:  # we want to split it into batches
-        extract_information([], ratios, 250, 4,iteration_batches=iteration,total_iterations=num_of_iterations)  # operation 4(not yet implemented)
+        extract_information([], ratios, 500, 4,iteration_batches=iteration,total_iterations=num_of_iterations)  # operation 4(not yet implemented)
     # ratios=ratios[:40]
     # Prints the CDF diagram
     hist, bin_edges = np.histogram(ratios, normed=True)
@@ -518,70 +537,395 @@ def completion_DB_processing(type,comparisson_set):
     else:
         return comparisson_set
 
-#~~~~~~~~~~~~~Overall~~~~~~~~~~~~~ 1 figure
-db = client[fake]
-temp=overall_figure("Fake",False,[])
-db = client[real]
-overall_figure("Real",True,temp)
-#~~~~~~~~~~~~~Overall In Batches~~~~~~~~~~~~~ Multiple figure
-num_of_iterations=(retweet_limit/split_per_retweetNumber)-1#has to calculate the number of batched it will create
-iter=0
-while(iter<=num_of_iterations):
+def overall_percentages_change(type, show, temp,iteration=0,num_of_iterations=0):
+    # get the max_timeUnits number of a tweet propagation time (in 30 mins units)
+    print "Calc max_timeUnits"
+    if num_of_iterations == 0:  # we dont want to split it into batches, we want ALL of it
+        max_timeUnits,counter_of_tweets_examined = extract_information([], [], 500, 3)  # it will return the maximum number of time units needed
+    else:  # we want to split it into batches
+        max_timeUnits,counter_of_tweets_examined = extract_information([], [], 500, 3, iteration_batches=iteration,
+                                            total_iterations=num_of_iterations)  # it will return the maximum number of time units needed
+    # initialization-create two lists values and numberOftweets and init them
+    values = []
+    numOftweets = []
+    for x in range(0, max_timeUnits):
+        values.append(0)  # on each row it has the sum of the number of retweets in the (rowNum) half-hour
+        numOftweets.append(
+            0)  # on each row has the number of tweets participated in values in order to calculate the avg
+
+    if num_of_iterations == 0:  # we dont want to split it into batches, we want ALL of it
+        extract_information(numOftweets, values, 500,
+                            1)  # it will run the appropriate operations (operation_one()) in order to return the arrays numOftweets and values
+    else:  # we want to split it into batches
+        extract_information(numOftweets, values, 500,
+                            1, iteration_batches=iteration,
+                            total_iterations=num_of_iterations)  # it will run the appropriate operations (operation_one()) in order to return the arrays numOftweets and values
+    # calculate average "" of tweets in that time interval
+    avg = []
+    counter = 0
+    for i in values:
+        if numOftweets[counter] != 0:
+            avg.append(i / float(numOftweets[counter]))
+        else:
+            avg.append(0)
+        counter = counter + 1
+    #calculate the percentage change on this array of avgs
+    # i=0
+    # for item in avg:
+    #     if item==0:
+    #         avg[i]=1
+    #     i=i+1
+    percentage_difference=[]
+    i=0
+    for item in avg:
+        if i!=0:
+            if avg[i-1]!=0:
+                difference=avg[i]-avg[i-1]
+                per_chng=100.0*(difference/float(avg[i-1]))
+                percentage_difference.append(per_chng)
+            else:
+                if avg[i]!=0:
+                    percentage_difference.append(None)#100 ->alternative
+                else:
+                    percentage_difference.append(None)#0 ->alternative
+        i=i+1
+    avg=percentage_difference
+    #Display the result
+    xlim=0
+    ylim=(-100,500)
+    if show:
+        if num_of_iterations == 0:  # we dont want to split it into batches, we want ALL of it
+            plot_single_graph(avg, type, show,'Percentage change number of retweets', temp,counter_of_tweets_examined, filename='percentage_change_overall_{}mins',y_lim=ylim,x_lim=xlim)
+        else:  # we want to split it into batches
+            plot_single_graph(avg, type, show,'Percentage change number of retweets',  temp,counter_of_tweets_examined, filename='percentage_change_overall_{}mins',
+                              iteration_batches=iteration, total_iterations=num_of_iterations,y_lim=ylim,x_lim=xlim)
+    else:
+        if num_of_iterations == 0:  # we dont want to split it into batches, we want ALL of it
+            return plot_single_graph(avg, type, show, 'Percentage change number of retweets', [],counter_of_tweets_examined, filename='percentage_change_overall_{}mins',y_lim=ylim,x_lim=xlim)
+        else:  # we want to split it into batches
+            return plot_single_graph(avg, type, show, 'Percentage change number of retweets', [],counter_of_tweets_examined, filename='percentage_change_overall_{}mins',
+                                     iteration_batches=iteration, total_iterations=num_of_iterations,y_lim=ylim,x_lim=xlim)
+
+def number_of_retweets_distribution(type):
+    print "Distribution of "+type
+    arr=[]
+    for og_tweet_collection in db.collection_names():  # for every tweet
+        collection = db[og_tweet_collection]
+        if og_tweet_collection != "users_info":
+            cursor = collection.find({})  # Gets the tweets in that topic
+            l=cursor.count()
+            if l != 0 and l<=retweet_limit:
+                arr.append(l)
+    sns.set_style("whitegrid")
+    colour = 'm'
+    if type is "Fake":
+        colour = '#1F77B4'
+    else:
+        colour = '#FF7F0F'
+
+    # Cut the window in 2 parts
+    f, (ax_box, ax_hist) = plt.subplots(2, sharex=True, gridspec_kw={"height_ratios": (.15, .85)})
+    # Add a graph in each part
+    sns.boxplot(arr, ax=ax_box,color=colour)
+    sns.distplot(arr,bins=8, rug=True, ax=ax_hist,color=colour)
+    # Remove x axis name for the boxplot
+    ax_box.set(xlabel='')
+
+    normalized_arr=preprocessing.normalize([arr])
+    # fig=sns.distplot(arr,bins=8,kde=False, norm_hist=True);
+
+    # fig = sns.kdeplot(arr, shade=True,hist=True)
+    # plt.yticks(fig.get_yticks(), fig.get_yticks() * 100)
+    ########################################
+    # bins = np.arange(0,500, 60)
+    # hist, edges = np.histogram(arr, bins)
+    # freq = hist / float(hist.sum()######)
+    # plt.bar(bins[:-1], freq, width=(500/len(bins))+3, align="edge",edgecolor='none',alpha=0.8)
+    ########################################
+    plt.xlabel('Number of retweets on a tweet chain')
+    # plt.ylabel("Frequency")
+    plt.title("Distribution of number of retweets on "+type+" news")
+    filename="distribution_of_"+type+"_news"
+    plt.savefig(dir + filename + savefiletype)
+    plt.show()
+
+def kde_plots(type, show,arr1,duration1):
+    print "kde plots of "+type
+    arr=[]
+    diffusion_duration=[]
+    for og_tweet_collection in db.collection_names():  # for every tweet
+        collection = db[og_tweet_collection]
+        if og_tweet_collection != "users_info":
+            cursor = collection.find({})  # Gets the tweets in that topic
+            l=cursor.count()
+            if l != 0 and l<=retweet_limit:
+                arr.append(l)
+                #get the duration of the diffusion
+                start_of_diffusion=datetime.now()
+                end_of_diffusion=datetime.now()
+                begin=True
+                for document in cursor:
+                    s = document["created_at"]
+                    dt = datetime.now()
+                    dt = dt.strptime(s, '%a %b %d %H:%M:%S +0000 %Y')
+                    if begin:
+                        begin=False
+                        start_of_diffusion=dt
+                        end_of_diffusion=dt
+                    if dt<start_of_diffusion:
+                        start_of_diffusion=dt
+                    if dt>end_of_diffusion:
+                        end_of_diffusion=dt
+                duration=end_of_diffusion-start_of_diffusion
+                diffusion_duration.append((duration.total_seconds()/60)/60)
+
+    sns.set_style("whitegrid")
+    #-----Density plot--------
+    sns.distplot(arr,bins=8,rug=True);
+    plt.xlabel('Number of retweets on a tweet chain')
+    plt.title("Density plot of number of retweets on "+type+" news")
+    filename="density_distribution_of_"+type+"_news"
+    plt.savefig(dir + filename + savefiletype)
+    plt.show()
+    #------bivariate kde plot(diffusion time-number of retweets)-----
+    colour='m'
+    if type is "Fake":
+        colour='#1F77B4'
+    else:
+        colour='#FF7F0F'
+    # ax = sns.kdeplot(arr,diffusion_duration)
+
+
+    ax = sns.jointplot(x=arr, y=diffusion_duration, kind="kde", color=colour,ylim=(0,600))
+    ax.plot_joint(plt.scatter, c="w", s=30, linewidth=1, marker="+")
+    ax.ax_joint.collections[0].set_alpha(0)
+    ax.set_axis_labels("$X$", "$Y$");
+
+    # ax.set(ylim=(0, 600))
+    plt.xlabel('Number of retweets on a tweet chain')
+    plt.ylabel('Total diffusion duration')
+    plt.title("Marginal density plot of " + type + " news")
+    filename = "marginal_densityPlot_of_" + type + "_news"
+    plt.savefig(dir + filename + savefiletype)
+    plt.show()
+    # ------regression kde plot(diffusion time-number of retweets)-----
+    if show:
+        #-------------make a dataframe-------
+        fakelistArray=['Fake']*len(arr1)
+        reallistArray = ['Real'] * len(arr)
+        fakeflag=fakelistArray+reallistArray
+        number_of_retweets=arr1+arr
+        duration_time=duration1+diffusion_duration
+        d = {'retweetNum': number_of_retweets, 'duration': duration_time,'veracity':fakeflag}
+        df = pd.DataFrame(data=d)
+        #-----------end with make dataframe
+        ax = sns.lmplot(x="retweetNum", y="duration", hue="veracity", data=df)
+        ax.set(ylim=(0, 2000))
+        plt.xlabel('Number of retweets on a tweet chain')
+        plt.ylabel('Total diffusion duration')
+        plt.title("Regression of Real and Fake news")
+        filename = "regression"
+        plt.savefig(dir + filename + savefiletype)
+        plt.show()
+    else:
+        return arr, diffusion_duration
+
+def scatter_plots(language):
+    dataFake=[]
+    indexFake=[]
+    dataReal = []
+    indexReal = []
     db = client[fake]
-    temp=overall_figure("Fake",False,[],iteration=iter,num_of_iterations=num_of_iterations)
-    db = client[real]
-    overall_figure("Real",True,temp,iteration=iter,num_of_iterations=num_of_iterations)
-    iter = iter + 1
-#~~~~~~~~~~~~~Overall with Boxplots~~~~~~~~~~~~~ 2 figures
-twoDarrayForOperationFive=[]
-db = client[fake]
-overall_boxplot_figure("Fake")
-twoDarrayForOperationFive=[]
-db = client[real]
-overall_boxplot_figure("Real")
-#~~~~~~~~~~~~~Overall with Boxplots with bathces~~~~~~~~~~~~~Multiple figures
-num_of_iterations=(retweet_limit/split_per_retweetNumber)-1#has to calculate the number of batched it will create
-iter=0
-while(iter<=num_of_iterations):
-    twoDarrayForOperationFive=[]
-    db = client[fake]
-    overall_boxplot_figure("Fake",iteration=iter,num_of_iterations=num_of_iterations)
-    twoDarrayForOperationFive=[]
-    db = client[real]
-    overall_boxplot_figure("Real",iteration=iter,num_of_iterations=num_of_iterations)
-    iter = iter + 1
-# #~~~~~~~~~~~~~Individual~~~~~~~~~~~~~ 2 figures
-# db = client[fake]
-# individual_fugures("Fake")
-# db = client[real]
-# individual_fugures("Real")
-# #~~~~~~~~~~~~~Verified Users~~~~~~~~~~~~~ 2 figures
-# db = client[fake]
-# graphs_of_verified_users("Fake")
-# db = client[real]
-# graphs_of_verified_users("Real")
-# #~~~~~~~~~~~~CDF~~~~~~~~~~~~~~ 1 figure
-# db = client[fake]
-# temp = cdf("fake", False, [])
-# db = client[real]
-# cdf("real", True, temp)
-# #~~~~~~~~~~~~CDF with batches~~~~~~~~~~~~~~ Multiple figure
-# num_of_iterations=(retweet_limit/split_per_retweetNumber)-1#has to calculate the number of batched it will create
-# iter=0
-# while(iter<=num_of_iterations):
-#     db = client[fake]
-#     temp = cdf("fake", False, [],iteration=iter,num_of_iterations=num_of_iterations)
-#     db = client[real]
-#     cdf("real", True, temp,iteration=iter,num_of_iterations=num_of_iterations)
-#     iter = iter + 1
-# #~~~~~~~~~~~~Friends/Followers Ratio~~~~~~~~~~~~~~ 1 figure
-# db = client[fake]
-# temp = friend_follower_ratio("fake", False, [])
-# db = client[real]
-# friend_follower_ratio("real", True, temp)
-# #~~~~~~~~~~~~Completion of DB processing~~~~~~~~~~~~~~ 2 figures
-# comparisson_set=set()
-# db = client[fake]
-# comparisson_set=completion_DB_processing("Fake",comparisson_set)
-# db = client[real]
-# completion_DB_processing("Real",comparisson_set)
+    type="Fake"
+    f=True
+    print f
+    while(f==True):
+        c=0
+        for og_tweet_collection in db.collection_names():
+            c=c+1
+            if c<=550:
+                collection = db[og_tweet_collection]
+                if og_tweet_collection != "users_info":
+                    cursor = collection.find({})
+                    try:
+                        status = api.get_status(id=og_tweet_collection)
+                        sourceName = status.user.screen_name
+                    except:
+                        sourceName="Deleted"
+                    print sourceName,c
+                    number_of_retweets = cursor.count()
+                    if type is "Fake":
+                        indexFake.append(sourceName)
+                        dataFake.append(number_of_retweets)
+                    else:
+                        indexReal.append(sourceName)
+                        dataReal.append(number_of_retweets)
+        print f
+        if type is "Real":
+            f=False
+        else:
+            db = client[real]
+            type = "Real"
+        print f,"should have changed", type
+    data=dataFake+dataReal
+    indexToChange=indexFake+indexReal
+    index=[]
+
+    for word in indexToChange:
+        newWord=""
+        if "_" in word:
+            newWord=word.replace("_", "\_")
+        else:
+            newWord=word
+        if language is "greek":
+            index.append(r"\textlatin{" + newWord + "}")
+        else:
+            index.append(newWord)
+    fakelistArray = ['Fake'] * len(dataFake)
+    reallistArray = ['Real'] * len(dataReal)
+    fakeflag = fakelistArray + reallistArray
+    d_general = {'retweetNum': data, 'tweetname': index, 'veracity': fakeflag}
+    d_fake = {'retweetNum': dataFake, 'tweetname': indexFake, 'veracity': fakelistArray}
+    d_real = {'retweetNum': dataReal, 'tweetname': indexReal, 'veracity': reallistArray}
+    plot_a_scatter_plot("general",language,d_general)
+    # plot_a_scatter_plot("general", language, d_fake)
+    # plot_a_scatter_plot("general", language, d_real)
+
+
+def plot_a_scatter_plot(type,language,d):
+    new_rc_params = {
+        "font.family": 'Times',
+        # probably python doesn't know Times, but it will replace it with a different font anyway. The final decision is up to the latex document anyway
+        "font.size": 6,  # choosing the font size helps latex to place all the labels, ticks etc. in the right place
+        "font.serif": [],
+        "svg.fonttype": 'none'}  # to store text as text, not as path
+    matplotlib.rcParams.update(new_rc_params)
+    filename = "scatter_plot_general" + "_" + language
+    if type != "general":
+        filename = "scatter_plot_of_" + type + "_news" + "_" + language
+
+    markers = {"Fake": "s", "Real": "X"}
+    ax = sns.scatterplot(x='tweetname', y='retweetNum', hue='veracity', data=d)
+
+    plt.xticks(rotation=90)
+    plt.ylim(-40, 2000)
+    plt.xlabel('User')
+    plt.ylabel("Number of retweets")
+    plt.title("Scatter plot of the tweet collection")
+    plt.savefig(dir + filename + savefiletype)
+    print dir+filename+savefiletype
+    plt.show()
+
+
+
+
+
+#________________EXECUTION SEGMENT_______________
+#In order to get a certain figure, simply uncomment the appropriate segment
+
+# minutes_list=[5,10,15,20,25,30]
+minutes_list=[30]
+show_once_flag=True
+
+for i in minutes_list:
+    mins=i
+    # # ~~~~~~~~~~~~~title:Overall~~~~~~~~~~~~~ 1 figure
+    # db = client[fake]
+    # temp=overall_figure("Fake",False,[])
+    # db = client[real]
+    # overall_figure("Real",True,temp)
+    # #~~~~~~~~~~~~~title:Overall In Batches~~~~~~~~~~~~~ Multiple figure
+    # num_of_iterations=(retweet_limit/split_per_retweetNumber)-1#has to calculate the number of batched it will create
+    # iter=0
+    # while(iter<=num_of_iterations):
+    #     db = client[fake]
+    #     temp=overall_figure("Fake",False,[],iteration=iter,num_of_iterations=num_of_iterations)
+    #     db = client[real]
+    #     overall_figure("Real",True,temp,iteration=iter,num_of_iterations=num_of_iterations)
+    #     iter = iter + 1
+    # #~~~~~~~~~~~~~title:Overall with Boxplots~~~~~~~~~~~~~ 2 figures
+    # twoDarrayForOperationFive=[]
+    # db = client[fake]
+    # overall_boxplot_figure("Fake")
+    # twoDarrayForOperationFive=[]
+    # db = client[real]
+    # overall_boxplot_figure("Real")
+    # #~~~~~~~~~~~~~title:Overall with Boxplots with bathces~~~~~~~~~~~~~Multiple figures
+    # num_of_iterations=(retweet_limit/split_per_retweetNumber)-1#has to calculate the number of batched it will create
+    # iter=0
+    # while(iter<=num_of_iterations):
+    #     twoDarrayForOperationFive=[]
+    #     db = client[fake]
+    #     overall_boxplot_figure("Fake",iteration=iter,num_of_iterations=num_of_iterations)
+    #     twoDarrayForOperationFive=[]
+    #     db = client[real]
+    #     overall_boxplot_figure("Real",iteration=iter,num_of_iterations=num_of_iterations)
+    #     iter = iter + 1
+    # #~~~~~~~~~~~~~title:Overall Percent Change~~~~~~~~~~~~~ 1 figure
+    # db = client[fake]
+    # temp=overall_percentages_change("Fake",False,[])
+    # db = client[real]
+    # overall_percentages_change("Real",True,temp)
+    # #~~~~~~~~~~~~~title:Overall Percent Change In Batches~~~~~~~~~~~~~ Multiple figure
+    # num_of_iterations=(retweet_limit/split_per_retweetNumber)-1#has to calculate the number of batched it will create
+    # iter=0
+    # while(iter<=num_of_iterations):
+    #     db = client[fake]
+    #     temp=overall_percentages_change("Fake",False,[],iteration=iter,num_of_iterations=num_of_iterations)
+    #     db = client[real]
+    #     overall_percentages_change("Real",True,temp,iteration=iter,num_of_iterations=num_of_iterations)
+    #     iter = iter + 1
+    #~~~~~PLOTS THAT SHOULD BE PRINTED ONLY ONCE~~~~~~~~~~~~~
+    if show_once_flag:
+        show_once_flag=False
+        # # ~~~title:Distribution Plot~~~~~~~~~~~~~
+        # db = client[fake]
+        # number_of_retweets_distribution("Fake")
+        # db = client[real]
+        # number_of_retweets_distribution("Real")
+        # ~~~title:KDE Plots~~~~~~~~~~~~~
+        # db = client[fake]
+        # a,b=kde_plots("Fake",False,[],[])
+        # db = client[real]
+        # kde_plots("Real",True,a,b)
+        # ~~~title:scatter Plots~~~~~~~~~~~~~
+        scatter_plots("english")
+        # # ~~~~~~~~~~~~title:Completion of DB processing~~~~~~~~~~~~~~ 2 figures
+        # comparisson_set = set()
+        # # db = client[fake]
+        # # comparisson_set = completion_DB_processing("Fake", comparisson_set)
+        # db = client[real]
+        # completion_DB_processing("Real", comparisson_set)
+        # # ~~~~~~~~~~~~title:Friends/Followers Ratio~~~~~~~~~~~~~~ 1 figure
+        # db = client[fake]
+        # temp = friend_follower_ratio("fake", False, [])
+        # db = client[real]
+        # friend_follower_ratio("real", True, temp)
+        # # ~~~~~~~~~~~~~title:Individual~~~~~~~~~~~~~ 2 figures
+        # db = client[fake]
+        # individual_fugures("Fake")
+        # db = client[real]
+        # individual_fugures("Real")
+        # # ~~~~~~~~~~~~~title:Verified Users~~~~~~~~~~~~~ 2 figures
+        # db = client[fake]
+        # graphs_of_verified_users("Fake")
+        # db = client[real]
+        # graphs_of_verified_users("Real")
+        # # ~~~~~~~~~~~~title:CDF~~~~~~~~~~~~~~ 1 figure
+        # db = client[fake]
+        # temp = cdf("fake", False, [])
+        # db = client[real]
+        # cdf("real", True, temp)
+        # # ~~~~~~~~~~~~title:CDF with batches~~~~~~~~~~~~~~ Multiple figure
+        # num_of_iterations = (retweet_limit / split_per_retweetNumber) - 1  # has to calculate the number of batched it will create
+        # iter = 0
+        # while (iter <= num_of_iterations):
+        #     db = client[fake]
+        #     temp = cdf("fake", False, [], iteration=iter, num_of_iterations=num_of_iterations)
+        #     db = client[real]
+        #     cdf("real", True, temp, iteration=iter, num_of_iterations=num_of_iterations)
+        #     iter = iter + 1
+
+
+
+

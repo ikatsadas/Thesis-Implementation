@@ -4,16 +4,15 @@ import sys
 import time
 from pymongo import MongoClient
 import networkx as nx
-import random
 
 #This script gets all the friends and followers of the users who were involved in a tweet chain and saves them to mongo appropriatly, in respect to the API's limitations  (both mongo and twitter)
 
 
 client = MongoClient('localhost', 27017)
-fake = 'getMostRetweetedFake'
-real = 'getMostRetweeted3'
+fake = 'nameDB'
+real = 'nameDB'
+mailto="emailAdress"
 db = client[fake]
-
 
 RTthreshold=500
 mongoThresholdPerDoc=300000 #(actual 600000, but just in case of crashing we have 500K)
@@ -41,7 +40,7 @@ def get_followers(user_id, tweetnumber, retweeter_num, total_retweeters):
             users += user
             time.sleep(60)
     except tweepy.error.TweepError:
-        print ("Error whilst geting the followers of user:", user_id)
+        print ("Error whilst getting the followers of user:", user_id)
     return users
 
 def get_friends(user_id, tweetnumber, retweeter_num, total_retweeters):
@@ -57,8 +56,26 @@ def get_friends(user_id, tweetnumber, retweeter_num, total_retweeters):
             users += user
             time.sleep(60)
     except tweepy.error.TweepError:
-        print ("Error whilst geting the friends of user:", user_id)
+        print ("Error whilst getting the friends of user:", user_id)
     return users
+
+def get_friends_or_followers_only_on_friendship_method(source,user_list):
+    #gets only the friends and the followers that overlap with the users on the tweet chain
+    user_followers=[]
+    user_friends=[]
+    for user in user_list:
+        if source != user:  # check every other node for friendship
+            try:
+                status = api.show_friendship(source_id=source, target_id=user)
+                # status[0].following,status[0].followed_by,status[1].following,status[1].followed_by
+                if status[0].following or status[1].followed_by:#the source follows the target
+                    user_friends.append(status[1].id)
+                if status[1].following or status[0].followed_by:#the source is followed by the target
+                    user_followers.append(status[1].id)
+            except tweepy.error.TweepError:
+                print ("Error whilst geting the friendship of either the source or the target (maybe one of them doesn't exist)")
+            time.sleep(15)
+    return user_friends,user_followers
 
 def update_specTweetId(collectionName,numberOfDocumentsSpecificTweetId,spec_tweet_id):
     # update query (updating the existing document to that collection)
@@ -170,7 +187,7 @@ def extract_information_for_users(stop):
         if og_tweet_collection != "users_info":  # to avoid examining the users_info collection
             collection = db[og_tweet_collection]
             cursor = collection.find({})  # Gets the tweets in that topic
-            if cursor.count()<=RTthreshold:#retweet Threshold (found to be 500)- this is done in order to complete the research faster by narrowing down the collection
+            if cursor.count()<=RTthreshold or cursor.count()!=0:#retweet Threshold (found to be 500)- this is done in order to complete the research faster by narrowing down the collection
                 user_set_of_a_tweet = set()
                 c = c + 1
                 if c > stop:
@@ -181,6 +198,7 @@ def extract_information_for_users(stop):
                     tweet = api.get_status(og_tweet_collection)
                     user_connections.append(tweet.user.id)
                     user_set_of_a_tweet.add(tweet.user.id)  # add the user to the specific tweet's user set
+                    source=tweet.user.id
                 except:
                     flag = False
                     print("the folowing tweet id has a problem", og_tweet_collection)
@@ -198,9 +216,16 @@ def extract_information_for_users(stop):
                                 if str(k) not in user_set:  # if we havent examined this user
                                     needsToSave=True
                                     # for every user_id get friends and followers
-                                    user_followers = get_followers(k, c, i, len(user_connections))
-                                    user_friends = get_friends(k, c, i, len(user_connections))
-                                    user_set.add(str(k))  # add that user to the general user set (EXAMINED)
+                                    user_followers=[]
+                                    user_friends=[]
+                                    if k is source:
+                                        #check the friendship with the rest of the users involved
+                                        user_friends,user_followers =get_friends_or_followers_only_on_friendship_method(source,user_connections)
+                                        #we dont add this user in the user_set so we can re examine it on another tweet chain
+                                    else:
+                                        user_followers = get_followers(k, c, i, len(user_connections))
+                                        user_friends = get_friends(k, c, i, len(user_connections))
+                                        user_set.add(str(k))  # add that user to the general user set (EXAMINED)
                                     # SAVE TO DB
                                     user_dict = {}
                                     user_dict["friends"] = user_friends
@@ -365,17 +390,17 @@ def emailThis(to, subject="", body="", files=[]):
 message = "This process had the pid: " + str(os.getpid())
 try:
     print ("This process has the pid", os.getpid())
-    emailThis("johnkats5896@gmail.com", subject="Script Started",
+    emailThis(mailto, subject="Script Started",
               body="The script has starteded, check the log file for more info!" + message)
     extract_information_for_users(300)
-    emailThis("johnkats5896@gmail.com", subject="Script pt 1 finished", body="The first part of the script has finished, chech the log file for more info! Now it will continue to the next segment!" + message)
+    emailThis(mailto, subject="Script pt 1 finished", body="The first part of the script has finished, chech the log file for more info! Now it will continue to the next segment!" + message)
     db = client[real]
     extract_information_for_users(300)
-    emailThis("johnkats5896@gmail.com", subject="Script finished",
+    emailThis(mailto, subject="Script finished",
               body="The script has finished, check the log file for more info!" + message)
 except:
     traceback.print_exc()
-    emailThis("johnkats5896@gmail.com", subject="Crash Report",
+    emailThis(mailto, subject="Crash Report",
               body="Check the script!" + message + "\n" + traceback.format_exc())
 
 
