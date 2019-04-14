@@ -562,7 +562,7 @@ def read_a_graph(path):
 # graph_generation_basedOn_tweet_with_friendship(0)
 #___________________________________________________
 #________Export metrics________THIS ONE WE USE
-path=r"C:\Users\johnk\Desktop\thesis\remoteDevelopment\graphs"
+path=r"path"
 print "___________FAKE_____________"
 read_a_graph(path+r"\fake")
 print "___________REAL_____________"
